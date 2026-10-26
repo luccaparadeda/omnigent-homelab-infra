@@ -8,6 +8,7 @@ creating credentials, or building the worker disk.
 | `make validate` | Passed: staged/unstaged whitespace, secret-pattern scan, ShellCheck, both Compose parses, all YAML, actionlint, static cost/credential/workflow guards, Ansible syntax, and ansible-lint |
 | Hash-locked validation environment | Passed: `pip --require-hashes` accepted every package in `requirements-dev.lock` under Python 3.14 |
 | Release-script integration test | Passed in a temporary local clone: tag/version/main ancestry check, tagged `.tar.gz` and `.zip` archives, SPDX placeholder checksum inclusion, archive integrity, and SHA-256 verification |
+| Initial hosted CI run | Exposed that GitHub's Ubuntu 24.04 image does not include ripgrep by default; fixed by installing it explicitly before repository validation |
 | Backup script dry run and `bash -n` | Passed for the timestamp-matched encrypted database/application objects |
 | OpenTofu 1.13.0 formatting/validation | Passed with the checksum-verified temporary binary and signed OCI provider 9.11.0; no plan/apply was run |
 | Packer 1.16.2 formatting/syntax | Passed with the checksum-verified temporary binary; the worker disk was not built |
