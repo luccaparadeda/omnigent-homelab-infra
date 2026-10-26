@@ -10,7 +10,7 @@ omnigent_port: 8000
 # Tailscale Serve terminates private HTTPS and is the only network-facing path.
 omnigent_bind_ip: "127.0.0.1"
 omnigent_tailscale_serve_enabled: true
-omnigent_tailscale_serve_target: "http://127.0.0.1:8000"
+omnigent_tailscale_serve_target: "http://127.0.0.1:{{ omnigent_port }}"
 omnigent_base_url: ""
 omnigent_postgres_password: ""
 omnigent_accounts_cookie_secret: ""
@@ -32,4 +32,6 @@ omnigent_backup_enabled: false
 omnigent_backup_bucket: ""
 omnigent_backup_age_recipient: ""
 omnigent_backup_calendar: "*-*-* 03:17:00"
+age_apt_version: "1.1.1-1ubuntu0.24.04.3"
+pipx_apt_version: "1.4.3-1"
 oci_cli_version: "3.95.1"

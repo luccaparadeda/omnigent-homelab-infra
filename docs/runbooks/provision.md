@@ -18,6 +18,11 @@ persists a private Tailscale Serve route. Install Tailscale on the phone, join
 the same tailnet, and enter the resulting
 `https://omnigent-control.TAILNET.ts.net` URL in the Omnigent mobile app.
 
+For native WireGuard instead, set `omnigent_tailscale_serve_enabled: false`,
+set `omnigent_bind_ip` to the control node's WireGuard address, and configure a
+trusted HTTPS reverse proxy on that private interface. Do not expose port 8000
+directly or use an HTTP URL for the mobile app.
+
 ## Configure OCI identities for Vault
 
 Create two narrowly matched dynamic groups:

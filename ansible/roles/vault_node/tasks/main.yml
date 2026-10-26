@@ -120,8 +120,8 @@
 - name: Install Vault snapshot dependencies
   ansible.builtin.apt:
     name:
-      - age
-      - pipx
+      - "age={{ age_apt_version }}"
+      - "pipx={{ pipx_apt_version }}"
     state: present
   when: vault_backup_enabled | bool
 
@@ -179,3 +179,31 @@
     state: started
     daemon_reload: true
   when: vault_backup_enabled | bool
+
+- name: Check for a previously installed Vault snapshot timer
+  ansible.builtin.stat:
+    path: /etc/systemd/system/omnigent-vault-backup.timer
+  register: vault_backup_timer_unit
+  when: not (vault_backup_enabled | bool)
+
+- name: Disable a previously installed Vault snapshot timer
+  ansible.builtin.systemd_service:
+    name: omnigent-vault-backup.timer
+    enabled: false
+    state: stopped
+    daemon_reload: true
+  when:
+    - not (vault_backup_enabled | bool)
+    - vault_backup_timer_unit.stat.exists
+
+- name: Remove disabled Vault snapshot unit files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/systemd/system/omnigent-vault-backup.timer
+    - /etc/systemd/system/omnigent-vault-backup.service
+  when:
+    - not (vault_backup_enabled | bool)
+    - vault_backup_timer_unit.stat.exists
+  notify: Reload systemd

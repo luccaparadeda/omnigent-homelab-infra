@@ -22,4 +22,6 @@ vault_backup_bucket: ""
 vault_backup_age_recipient: ""
 vault_backup_role: omnigent-vault-backup
 vault_backup_calendar: "*-*-* 03:41:00"
+age_apt_version: "1.1.1-1ubuntu0.24.04.3"
+pipx_apt_version: "1.4.3-1"
 oci_cli_version: "3.95.1"

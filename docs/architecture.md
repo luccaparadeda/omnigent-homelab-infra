@@ -17,6 +17,12 @@ The container port is bound only to loopback. Tailscale Serve terminates trusted
 HTTPS and publishes the UI inside the tailnet for desktop, browser, and mobile
 clients; no OCI public ingress rule exposes it.
 
+Native WireGuard remains supported as an operator-managed alternative. Set
+`omnigent_tailscale_serve_enabled: false`, bind `omnigent_bind_ip` to the
+WireGuard interface address, and place a trusted HTTPS reverse proxy on that
+private address. The Omnigent mobile app requires an `https://` URL; binding to
+loopback without Tailscale Serve or another proxy is intentionally unreachable.
+
 ### Secrets plane
 
 HashiCorp Vault runs as a separate logical service and exposes only the Transit operations needed by Omnigent. Its Transit key must be created with `derived=true`. Vault uses OCI KMS auto-unseal with an instance principal; no OCI API private key is baked into the VM.

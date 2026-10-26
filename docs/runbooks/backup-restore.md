@@ -44,9 +44,12 @@ sudo systemctl list-timers omnigent-vault-backup.timer
 ```
 
 The job authenticates with the Vault VM's OCI instance principal, creates the
-snapshot inside the Vault container, copies it to a private temporary
-directory, encrypts it with the offline `age` recipient, uploads it, and
-removes local plaintext on exit.
+snapshot in a container tmpfs, copies it into `/dev/shm`, encrypts it with the
+offline `age` recipient, uploads it, and removes local plaintext on exit. A
+host crash or container restart discards both memory-backed plaintext paths;
+unique names and an execution lock prevent overlapping jobs from sharing a
+snapshot. The systemd service waits for Vault readiness and retries transient
+startup failures.
 
 ## Create a reviewed boot backup
 

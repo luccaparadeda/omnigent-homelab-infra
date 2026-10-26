@@ -47,15 +47,17 @@
 - name: Install backup tooling
   ansible.builtin.apt:
     name:
-      - age
-      - pipx
+      - "age={{ age_apt_version }}"
+      - "pipx={{ pipx_apt_version }}"
     state: present
+  when: omnigent_backup_enabled | bool
 
 - name: Read installed OCI CLI version
   ansible.builtin.command: /usr/local/bin/oci --version
   register: installed_oci_cli
   changed_when: false
   failed_when: false
+  when: omnigent_backup_enabled | bool
 
 - name: Install pinned OCI CLI for instance-principal backup uploads
   ansible.builtin.command:
@@ -64,7 +66,9 @@
   environment:
     PIPX_HOME: /opt/oci-cli-pipx
     PIPX_BIN_DIR: /usr/local/bin
-  when: oci_cli_version not in installed_oci_cli.stdout
+  when:
+    - omnigent_backup_enabled | bool
+    - oci_cli_version not in installed_oci_cli.stdout
 
 - name: Install Vault CA certificate for the Omnigent client
   ansible.builtin.copy:
@@ -132,7 +136,15 @@
   failed_when: false
   when:
     - control_plane_start_services | bool
-    - omnigent_tailscale_serve_enabled | bool
+
+- name: Reset stale or disabled Tailscale Serve configuration
+  ansible.builtin.command: tailscale serve reset
+  changed_when: true
+  when:
+    - control_plane_start_services | bool
+    - omnigent_tailscale_serve_status.rc == 0
+    - omnigent_tailscale_serve_status.stdout | trim not in ['', '{}']
+    - not (omnigent_tailscale_serve_enabled | bool) or omnigent_tailscale_serve_target not in omnigent_tailscale_serve_status.stdout
 
 - name: Publish Omnigent through private Tailscale HTTPS
   ansible.builtin.command:
@@ -186,3 +198,31 @@
     state: started
     daemon_reload: true
   when: omnigent_backup_enabled | bool
+
+- name: Check for a previously installed backup timer
+  ansible.builtin.stat:
+    path: /etc/systemd/system/omnigent-backup.timer
+  register: omnigent_backup_timer_unit
+  when: not (omnigent_backup_enabled | bool)
+
+- name: Disable a previously installed backup timer
+  ansible.builtin.systemd_service:
+    name: omnigent-backup.timer
+    enabled: false
+    state: stopped
+    daemon_reload: true
+  when:
+    - not (omnigent_backup_enabled | bool)
+    - omnigent_backup_timer_unit.stat.exists
+
+- name: Remove disabled backup unit files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/systemd/system/omnigent-backup.timer
+    - /etc/systemd/system/omnigent-backup.service
+  when:
+    - not (omnigent_backup_enabled | bool)
+    - omnigent_backup_timer_unit.stat.exists
+  notify: Reload systemd
