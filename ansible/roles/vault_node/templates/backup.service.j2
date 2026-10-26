@@ -1,0 +1,21 @@
+[Unit]
+Description=Create and upload an encrypted Omnigent Vault Raft snapshot
+After=docker.service network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=30m
+StartLimitBurst=3
+
+[Service]
+Type=oneshot
+User=root
+Environment=VAULT_COMPOSE_ROOT={{ vault_root }}
+Environment=VAULT_BACKUP_BUCKET={{ vault_backup_bucket }}
+Environment=VAULT_BACKUP_AGE_RECIPIENT={{ vault_backup_age_recipient }}
+Environment=VAULT_BACKUP_ROLE={{ vault_backup_role }}
+ExecStart=/usr/local/sbin/omnigent-vault-backup
+Restart=on-failure
+RestartSec=5m
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true

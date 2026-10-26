@@ -14,7 +14,7 @@ credentials and does not deploy from CI.
 
 ```text
                                   private VPN
-                        Tailscale or native WireGuard
+                           Tailscale by default
 
   phone / browser ────────────── Omnigent control plane (OCI)
                                       │
@@ -99,7 +99,8 @@ OCI, Vault, Tailscale, or worker credentials. See
 1. Confirm the CPU architecture and operating system of the home PC and laptop.
 2. Confirm the Oracle tenancy home region, availability domain, and Always Free capacity.
 3. Re-verify the pinned multi-architecture container digests for the planned release.
-4. Decide between Tailscale and native WireGuard.
+4. Use the default Tailscale private-HTTPS path, or explicitly configure the
+   documented native WireGuard overrides and a trusted private HTTPS proxy.
 5. Create or select an OCI compartment, then review IAM, KMS, Object Storage, and backup retention.
 6. Install the dedicated worker with full-disk encryption from the guarded
    autoinstall seed, apply Ansible twice, and verify that it contains no

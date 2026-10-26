@@ -37,6 +37,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      vault-proxy:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       ARTIFACT_DIR: /data/artifacts
@@ -49,7 +51,6 @@ services:
       OMNIGENT_CREDENTIAL_VAULT_KEY: ${OMNIGENT_CREDENTIAL_VAULT_KEY:-}
       OMNIGENT_CREDENTIAL_VAULT_MOUNT: ${OMNIGENT_CREDENTIAL_VAULT_MOUNT:-transit}
       VAULT_ADDR: ${VAULT_ADDR:-}
-      VAULT_TOKEN: ${VAULT_TOKEN:-}
       VAULT_CACERT: /run/secrets/vault-ca.crt
       REQUESTS_CA_BUNDLE: /run/secrets/vault-ca.crt
     volumes:
@@ -79,7 +80,50 @@ services:
       - no-new-privileges:true
     networks:
       - backend
+      - vault-client
+
+  vault-proxy:
+    image: ${VAULT_PROXY_IMAGE:?Set VAULT_PROXY_IMAGE in .env}
+    restart: unless-stopped
+    command: proxy -config=/vault/proxy/config.hcl
+    environment:
+      VAULT_ADDR: ${VAULT_UPSTREAM_ADDR:?Set VAULT_UPSTREAM_ADDR in .env}
+      VAULT_CACERT: /vault/ca/ca.crt
+      VAULT_TRANSIT_KEY: ${OMNIGENT_CREDENTIAL_VAULT_KEY:-omnigent-credentials}
+      VAULT_TRANSIT_MOUNT: ${OMNIGENT_CREDENTIAL_VAULT_MOUNT:-transit}
+      NO_PROXY: 127.0.0.1,localhost,169.254.169.254
+      no_proxy: 127.0.0.1,localhost,169.254.169.254
+    volumes:
+      - type: bind
+        source: ./vault-proxy.hcl
+        target: /vault/proxy/config.hcl
+        read_only: true
+      - type: bind
+        source: ${VAULT_CA_ROOT:-/etc/omnigent/vault-ca}/ca.crt
+        target: /vault/ca/ca.crt
+        read_only: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=0700
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          VAULT_ADDR=http://127.0.0.1:8100 vault read -format=json
+          "$${VAULT_TRANSIT_MOUNT}/keys/$${VAULT_TRANSIT_KEY}" >/dev/null
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    networks:
+      - vault-client
 
 networks:
   backend:
+    driver: bridge
+  vault-client:
     driver: bridge

@@ -9,9 +9,15 @@ After initialization:
 1. Enable the Transit engine at `transit/`.
 2. Create `omnigent-credentials` with `derived=true`.
 3. Apply `policies/omnigent-transit.hcl`.
-4. Issue Omnigent a narrow token under that policy; do not use the root token.
-5. Revoke the initialization root token after creating durable operator access.
-6. Enable at least two independently monitored audit devices and configure encrypted log retention.
-7. Back up Raft storage and test restoration while the OCI KMS key remains available.
+4. Enable the OCI auth method and map the control VM's dynamic group to an
+   `omnigent-control` role with only the `omnigent-transit` policy.
+5. Map the Vault VM's dynamic group to an `omnigent-vault-backup` role with
+   only the `vault-backup` policy.
+6. Let the control-plane Vault Proxy authenticate with OCI instance identity;
+   never place a static or root Vault token in the Omnigent environment.
+7. Revoke the initialization root token after creating durable operator access.
+8. Enable at least two independently monitored audit devices and configure encrypted log retention.
+9. Enable, inspect, and restore-test the encrypted Raft snapshot timer while
+   the OCI KMS key remains available.
 
 Deleting the OCI auto-unseal key permanently makes the Vault data unrecoverable, including from backups. Protect the KMS key with restrictive IAM and a deletion-prevention process.

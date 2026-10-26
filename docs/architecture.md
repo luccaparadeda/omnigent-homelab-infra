@@ -13,13 +13,27 @@ The control plane runs on Oracle Ubuntu ARM64 and contains:
 - Encrypted credential records
 - Backup and health-check jobs
 
-The container port is bound to the node's Tailscale address after enrollment. HTTPS can be published inside the tailnet with Tailscale Serve or a VPN-bound reverse proxy; no OCI public ingress rule exposes it.
+The container port is bound only to loopback. Tailscale Serve terminates trusted
+HTTPS and publishes the UI inside the tailnet for desktop, browser, and mobile
+clients; no OCI public ingress rule exposes it.
+
+Native WireGuard remains supported as an operator-managed alternative. Set
+`omnigent_tailscale_serve_enabled: false`, bind `omnigent_bind_ip` to the
+WireGuard interface address, and place a trusted HTTPS reverse proxy on that
+private address. The Omnigent mobile app requires an `https://` URL; binding to
+loopback without Tailscale Serve or another proxy is intentionally unreachable.
 
 ### Secrets plane
 
 HashiCorp Vault runs as a separate logical service and exposes only the Transit operations needed by Omnigent. Its Transit key must be created with `derived=true`. Vault uses OCI KMS auto-unseal with an instance principal; no OCI API private key is baked into the VM.
 
 The Omnigent database holds ciphertext. Vault holds the encryption key. During a legitimate request, the Omnigent server can ask Vault to decrypt a credential for its owning workspace, user, provider, and account context. Vault therefore improves key separation and encryption at rest, but it does not make a live, fully compromised Omnigent server harmless.
+
+A Vault Proxy sidecar on the control node authenticates through Vault's OCI
+auth method using the VM's automatically rotated instance principal. It
+renews the short-lived Vault token and forces that token onto requests sent by
+Omnigent. No static Vault token or OCI API private key is stored in the
+Omnigent container, Compose environment, or Ansible inventory.
 
 ### Execution workers
 

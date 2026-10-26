@@ -1,0 +1,26 @@
+vault {
+  address = "{{ omnigent_vault_addr }}"
+  ca_cert = "/vault/ca/ca.crt"
+}
+
+auto_auth {
+  enable_reauth_on_new_credentials = true
+
+  method "oci" {
+    mount_path = "{{ omnigent_vault_proxy_auth_mount }}"
+    config = {
+      role                     = "{{ omnigent_vault_proxy_role }}"
+      type                     = "instance"
+      credential_poll_interval = "{{ omnigent_vault_proxy_credential_poll_interval }}"
+    }
+  }
+}
+
+api_proxy {
+  use_auto_auth_token = "force"
+}
+
+listener "tcp" {
+  address     = "0.0.0.0:8100"
+  tls_disable = true
+}
