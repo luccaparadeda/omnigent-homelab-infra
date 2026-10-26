@@ -14,6 +14,7 @@ infrastructure was deployed and no credential was enrolled.
 | Medium | Default token permissions can drift to write access. | Workflows declare read-only permissions globally and elevate only the release, CodeQL, and Scorecard jobs for documented outputs. Repository publication sets the GitHub default to read-only. |
 | Medium | Workflow syntax was validated locally but actionlint was not installed by hosted CI. | CI and release jobs install pinned actionlint 1.7.10 before `make validate`. |
 | Medium | Dependency or IaC regressions could pass ordinary syntax checks. | Dependency Review, Trivy configuration scanning, CodeQL for Actions, and OpenSSF Scorecard workflows are separate required signals. |
+| High | The first Trivy run confirmed the upstream server image had no non-root `USER`. | The derived image now runs as stable UID/GID `10001`, Compose repeats the restriction, Ansible scopes bind-mount ownership, and a static guard prevents regression. |
 
 ## Pass 2 — release integrity and recoverability
 

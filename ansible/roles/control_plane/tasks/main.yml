@@ -33,14 +33,14 @@
   ansible.builtin.file:
     path: "{{ item.path }}"
     state: directory
-    owner: root
-    group: root
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
     mode: "{{ item.mode }}"
   loop:
     - { path: "{{ control_plane_root }}", mode: "0750" }
     - { path: "{{ control_plane_data_root }}/postgres", mode: "0700" }
-    - { path: "{{ control_plane_data_root }}/artifacts", mode: "0750" }
-    - { path: "{{ control_plane_data_root }}/admin-credentials", mode: "0700" }
+    - { path: "{{ control_plane_data_root }}/artifacts", mode: "0750", owner: "10001", group: "10001" }
+    - { path: "{{ control_plane_data_root }}/admin-credentials", mode: "0700", owner: "10001", group: "10001" }
     - { path: "{{ omnigent_vault_ca_root }}", mode: "0750" }
 
 - name: Install backup tooling

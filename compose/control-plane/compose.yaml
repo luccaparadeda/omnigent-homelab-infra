@@ -32,6 +32,7 @@ services:
       args:
         BASE_IMAGE: ${OMNIGENT_BASE_IMAGE:?Set OMNIGENT_BASE_IMAGE in .env}
     image: ${OMNIGENT_SERVER_IMAGE:?Set OMNIGENT_SERVER_IMAGE in .env}
+    user: "10001:10001"
     restart: unless-stopped
     depends_on:
       postgres:
