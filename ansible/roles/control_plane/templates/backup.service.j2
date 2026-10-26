@@ -1,0 +1,12 @@
+[Unit]
+Description=Encrypted Omnigent logical backup to OCI Object Storage
+Requires=docker.service
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/omnigent-backup --execute --compose-dir {{ control_plane_root }} --data-dir {{ control_plane_data_root }} --bucket {{ omnigent_backup_bucket }} --age-recipient {{ omnigent_backup_age_recipient }}
+User=root
+Group=root
+PrivateTmp=true
+NoNewPrivileges=true

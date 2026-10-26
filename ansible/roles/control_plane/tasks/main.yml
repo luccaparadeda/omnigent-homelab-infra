@@ -1,0 +1,160 @@
+---
+- name: Read control-plane Tailscale IP
+  ansible.builtin.command: tailscale ip -4
+  register: control_tailscale_ip
+  changed_when: false
+  failed_when: false
+  when: omnigent_bind_ip | length == 0
+
+- name: Select private bind IP
+  ansible.builtin.set_fact:
+    control_private_ip: >-
+      {{ omnigent_bind_ip if omnigent_bind_ip | length > 0 else (control_tailscale_ip.stdout | trim) }}
+
+- name: Require deployment secrets only when starting services
+  ansible.builtin.assert:
+    that:
+      - control_private_ip | length > 0
+      - omnigent_base_url | length > 0
+      - omnigent_postgres_password | length >= 24
+      - omnigent_postgres_password is match('^[A-Za-z0-9._~-]+$')
+      - omnigent_accounts_cookie_secret | length >= 32
+      - omnigent_accounts_cookie_secret is match('^[A-Za-z0-9._~-]+$')
+      - omnigent_accounts_init_admin_password | length >= 16
+      - omnigent_accounts_init_admin_password is match('^[A-Za-z0-9._~-]+$')
+      - omnigent_vault_addr | length > 0
+      - omnigent_credential_vault_token | length > 0
+      - omnigent_vault_ca_src | length > 0
+    fail_msg: "Private networking and URL-safe deployment secrets must be supplied before starting Omnigent."
+  when: control_plane_start_services | bool
+  no_log: true
+
+- name: Create control-plane directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ control_plane_root }}", mode: "0750" }
+    - { path: "{{ control_plane_data_root }}/postgres", mode: "0700" }
+    - { path: "{{ control_plane_data_root }}/artifacts", mode: "0750" }
+    - { path: "{{ control_plane_data_root }}/admin-credentials", mode: "0700" }
+    - { path: "{{ omnigent_vault_ca_root }}", mode: "0750" }
+
+- name: Install backup tooling
+  ansible.builtin.apt:
+    name:
+      - age
+      - pipx
+    state: present
+
+- name: Read installed OCI CLI version
+  ansible.builtin.command: /usr/local/bin/oci --version
+  register: installed_oci_cli
+  changed_when: false
+  failed_when: false
+
+- name: Install pinned OCI CLI for instance-principal backup uploads
+  ansible.builtin.command:
+    cmd: "pipx install --force oci-cli=={{ oci_cli_version }}"
+  changed_when: true
+  environment:
+    PIPX_HOME: /opt/oci-cli-pipx
+    PIPX_BIN_DIR: /usr/local/bin
+  when: oci_cli_version not in installed_oci_cli.stdout
+
+- name: Install Vault CA certificate for the Omnigent client
+  ansible.builtin.copy:
+    src: "{{ omnigent_vault_ca_src }}"
+    dest: "{{ omnigent_vault_ca_root }}/ca.crt"
+    owner: root
+    group: root
+    mode: "0644"
+  when: control_plane_start_services | bool
+  notify: Restart control plane
+
+- name: Install reviewed control-plane Compose definition
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../compose/control-plane/compose.yaml"
+    dest: "{{ control_plane_root }}/compose.yaml"
+    owner: root
+    group: root
+    mode: "0640"
+  notify: Restart control plane
+
+- name: Install Vault-enabled Omnigent image definition
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0640"
+  loop:
+    - { src: "{{ playbook_dir }}/../../compose/control-plane/Dockerfile", dest: "{{ control_plane_root }}/Dockerfile" }
+    - { src: "{{ playbook_dir }}/../../compose/control-plane/requirements-vault.txt", dest: "{{ control_plane_root }}/requirements-vault.txt" }
+    - { src: "{{ playbook_dir }}/../../compose/control-plane/.dockerignore", dest: "{{ control_plane_root }}/.dockerignore" }
+  notify: Restart control plane
+
+- name: Render secret control-plane environment
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ control_plane_root }}/.env"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Restart control plane
+  no_log: true
+
+- name: Start control-plane services after explicit enablement
+  ansible.builtin.command:
+    cmd: docker compose up -d --build --remove-orphans
+    chdir: "{{ control_plane_root }}"
+  register: control_compose_up
+  changed_when: "'Started' in control_compose_up.stdout or 'Created' in control_compose_up.stdout"
+  when: control_plane_start_services | bool
+
+- name: Validate optional encrypted backup settings
+  ansible.builtin.assert:
+    that:
+      - omnigent_backup_bucket | length > 0
+      - omnigent_backup_age_recipient | length > 0
+    fail_msg: "A bucket name and age public recipient are required when backups are enabled."
+  when: omnigent_backup_enabled | bool
+
+- name: Install encrypted logical-backup script
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../scripts/backup-control-plane.sh"
+    dest: /usr/local/sbin/omnigent-backup
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Install backup systemd service
+  ansible.builtin.template:
+    src: backup.service.j2
+    dest: /etc/systemd/system/omnigent-backup.service
+    owner: root
+    group: root
+    mode: "0644"
+  when: omnigent_backup_enabled | bool
+  notify: Reload systemd
+
+- name: Install backup systemd timer
+  ansible.builtin.template:
+    src: backup.timer.j2
+    dest: /etc/systemd/system/omnigent-backup.timer
+    owner: root
+    group: root
+    mode: "0644"
+  when: omnigent_backup_enabled | bool
+  notify: Reload systemd
+
+- name: Enable encrypted backup timer
+  ansible.builtin.systemd_service:
+    name: omnigent-backup.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: omnigent_backup_enabled | bool

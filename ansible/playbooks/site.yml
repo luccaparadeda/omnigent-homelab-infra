@@ -1,0 +1,27 @@
+---
+- name: Configure every Omnigent node
+  hosts: all
+  become: true
+  roles:
+    - common
+
+- name: Configure control plane
+  hosts: control_plane
+  become: true
+  roles:
+    - docker_engine
+    - control_plane
+
+- name: Configure Vault
+  hosts: vault_nodes
+  become: true
+  roles:
+    - docker_engine
+    - vault_node
+
+- name: Configure execution workers
+  hosts: workers
+  become: true
+  roles:
+    - docker_engine
+    - worker

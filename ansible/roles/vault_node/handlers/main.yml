@@ -1,0 +1,7 @@
+---
+- name: Restart Vault
+  ansible.builtin.command:
+    cmd: docker compose up -d --remove-orphans
+    chdir: "{{ vault_root }}"
+  when: vault_start_services | bool
+  changed_when: true

@@ -1,0 +1,3 @@
+# Every clone needs a new value so cloud-init treats it as a first boot.
+instance-id: REPLACE_WITH_UNIQUE_CLONE_ID
+local-hostname: home-worker

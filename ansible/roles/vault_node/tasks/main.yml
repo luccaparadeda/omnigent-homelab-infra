@@ -1,0 +1,97 @@
+---
+- name: Read Vault Tailscale IP
+  ansible.builtin.command: tailscale ip -4
+  register: vault_tailscale_ip
+  changed_when: false
+  failed_when: false
+  when: vault_bind_ip | length == 0
+
+- name: Select Vault private bind IP
+  ansible.builtin.set_fact:
+    vault_private_ip: >-
+      {{ vault_bind_ip if vault_bind_ip | length > 0 else (vault_tailscale_ip.stdout | trim) }}
+
+- name: Check for active swap on the dedicated Vault node
+  ansible.builtin.command: swapon --show --noheadings
+  register: vault_active_swap
+  changed_when: false
+
+- name: Refuse to start Vault while swap is active
+  ansible.builtin.assert:
+    that:
+      - vault_active_swap.stdout | trim | length == 0
+    fail_msg: >-
+      Vault requires swap to be disabled. Remove active and persistent swap,
+      reboot if needed, and re-run this play before enabling the service.
+  when: vault_start_services | bool
+
+- name: Require KMS and TLS inputs only when starting Vault
+  ansible.builtin.assert:
+    that:
+      - vault_private_ip | length > 0
+      - vault_api_addr | length > 0
+      - vault_cluster_addr | length > 0
+      - oci_kms_key_id | length > 0
+      - oci_kms_crypto_endpoint | length > 0
+      - oci_kms_management_endpoint | length > 0
+      - vault_tls_cert_src | length > 0
+      - vault_tls_key_src | length > 0
+      - vault_tls_ca_src | length > 0
+    fail_msg: "Private networking, OCI KMS values, and TLS files are required before Vault can start."
+  when: vault_start_services | bool
+
+- name: Create Vault directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ vault_root }}/config", mode: "0750" }
+    - { path: "{{ vault_data_root }}/data", mode: "0700" }
+    - { path: "{{ vault_tls_root }}", mode: "0700" }
+
+- name: Install reviewed Vault files
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0640"
+  loop:
+    - { src: "{{ playbook_dir }}/../../compose/vault/compose.yaml", dest: "{{ vault_root }}/compose.yaml" }
+    - { src: "{{ playbook_dir }}/../../compose/vault/config/vault.hcl", dest: "{{ vault_root }}/config/vault.hcl" }
+  notify: Restart Vault
+
+- name: Install Vault TLS material
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - { src: "{{ vault_tls_cert_src }}", dest: "{{ vault_tls_root }}/server.crt", mode: "0644" }
+    - { src: "{{ vault_tls_key_src }}", dest: "{{ vault_tls_root }}/server.key", mode: "0600" }
+    - { src: "{{ vault_tls_ca_src }}", dest: "{{ vault_tls_root }}/ca.crt", mode: "0644" }
+  when: vault_start_services | bool
+  notify: Restart Vault
+  no_log: true
+
+- name: Render Vault environment
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ vault_root }}/.env"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Restart Vault
+
+- name: Start Vault only after explicit enablement
+  ansible.builtin.command:
+    cmd: docker compose up -d --remove-orphans
+    chdir: "{{ vault_root }}"
+  register: vault_compose_up
+  changed_when: "'Started' in vault_compose_up.stdout or 'Created' in vault_compose_up.stdout"
+  when: vault_start_services | bool

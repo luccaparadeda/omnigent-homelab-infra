@@ -1,0 +1,8 @@
+---
+- name: Configure the Omnigent control plane
+  hosts: control_plane
+  become: true
+  roles:
+    - common
+    - docker_engine
+    - control_plane

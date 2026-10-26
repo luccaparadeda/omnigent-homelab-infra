@@ -1,0 +1,18 @@
+---
+# Copy to a private inventory and encrypt immediately:
+# ansible-vault encrypt inventory/production/group_vars/all/vault.yml
+# Never commit plaintext secrets or the Ansible Vault password.
+
+omnigent_postgres_password: "CHANGE_ME"
+omnigent_credential_vault_token: "CHANGE_ME"
+
+# OCI KMS identifiers are not secret, but are deployment-specific.
+oci_kms_key_id: "ocid1.key.oc1..example"
+oci_kms_crypto_endpoint: "https://example-crypto.kms.REGION.oraclecloud.com"
+oci_kms_management_endpoint: "https://example-management.kms.REGION.oraclecloud.com"
+
+# These files stay outside this repository. The private key remains secret.
+vault_tls_cert_src: "/secure/path/vault.crt"
+vault_tls_key_src: "/secure/path/vault.key"
+vault_tls_ca_src: "/secure/path/ca.crt"
+omnigent_vault_ca_src: "/secure/path/ca.crt"

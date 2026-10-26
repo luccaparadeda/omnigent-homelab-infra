@@ -1,0 +1,6 @@
+---
+profile: basic
+skip_list:
+  # These role variables are intentionally shared, documented inventory inputs.
+  # Renaming them only to mirror directory names would obscure their domain use.
+  - var-naming[no-role-prefix]

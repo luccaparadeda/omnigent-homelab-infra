@@ -1,0 +1,47 @@
+name: omnigent-vault
+
+services:
+  vault:
+    image: ${VAULT_IMAGE:?Set VAULT_IMAGE in .env}
+    restart: unless-stopped
+    command: server -config=/vault/config/vault.hcl
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_ADDR: ${VAULT_API_ADDR:?Set VAULT_API_ADDR in .env}
+      VAULT_CACERT: /vault/tls/ca.crt
+      VAULT_API_ADDR: ${VAULT_API_ADDR:?Set VAULT_API_ADDR in .env}
+      VAULT_CLUSTER_ADDR: ${VAULT_CLUSTER_ADDR:?Set VAULT_CLUSTER_ADDR in .env}
+      VAULT_OCIKMS_SEAL_KEY_ID: ${VAULT_OCIKMS_SEAL_KEY_ID:?Set VAULT_OCIKMS_SEAL_KEY_ID in .env}
+      VAULT_OCIKMS_CRYPTO_ENDPOINT: ${VAULT_OCIKMS_CRYPTO_ENDPOINT:?Set VAULT_OCIKMS_CRYPTO_ENDPOINT in .env}
+      VAULT_OCIKMS_MANAGEMENT_ENDPOINT: ${VAULT_OCIKMS_MANAGEMENT_ENDPOINT:?Set VAULT_OCIKMS_MANAGEMENT_ENDPOINT in .env}
+    volumes:
+      - type: bind
+        source: ./config
+        target: /vault/config
+        read_only: true
+      - type: bind
+        source: ${VAULT_DATA_ROOT:-/srv/vault}/data
+        target: /vault/file
+      - type: bind
+        source: ${VAULT_TLS_ROOT:-/etc/omnigent/vault/tls}
+        target: /vault/tls
+        read_only: true
+    ports:
+      - ${VAULT_BIND_IP:-127.0.0.1}:8200:8200
+      - ${VAULT_BIND_IP:-127.0.0.1}:8201:8201
+    healthcheck:
+      test:
+        - CMD
+        - vault
+        - status
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      core:
+        soft: 0
+        hard: 0

@@ -1,0 +1,26 @@
+---
+control_plane_root: /opt/omnigent-control-plane
+control_plane_data_root: /srv/omnigent
+control_plane_start_services: false
+omnigent_version: "0.19.1"
+omnigent_base_image: "ghcr.io/omnigent-ai/omnigent-server@sha256:b211b81fb739a7be9b326603d54511cc1f1e2f91f311b85ac2ea144c85129d56"
+omnigent_server_image: "local/omnigent-server-vault:0.19.1-hvac2.4.0"
+postgres_image: "postgres@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b"
+omnigent_port: 8000
+omnigent_bind_ip: ""
+omnigent_base_url: ""
+omnigent_postgres_password: ""
+omnigent_accounts_cookie_secret: ""
+omnigent_accounts_init_admin_password: ""
+omnigent_credential_cipher: vault
+omnigent_credential_vault_key: omnigent-credentials
+omnigent_credential_vault_mount: transit
+omnigent_vault_addr: ""
+omnigent_credential_vault_token: ""
+omnigent_vault_ca_src: ""
+omnigent_vault_ca_root: /etc/omnigent/vault-ca
+omnigent_backup_enabled: false
+omnigent_backup_bucket: ""
+omnigent_backup_age_recipient: ""
+omnigent_backup_calendar: "*-*-* 03:17:00"
+oci_cli_version: "3.95.1"

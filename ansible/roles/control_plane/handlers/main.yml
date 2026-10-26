@@ -1,0 +1,11 @@
+---
+- name: Restart control plane
+  ansible.builtin.command:
+    cmd: docker compose up -d --build --remove-orphans
+    chdir: "{{ control_plane_root }}"
+  when: control_plane_start_services | bool
+  changed_when: true
+
+- name: Reload systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true

@@ -1,0 +1,57 @@
+# Local secrets and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.token
+credentials*
+secrets*
+recovery-keys*
+ansible/inventory/production/
+
+# OpenTofu / Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+*.tfvars
+!*.tfvars.example
+
+# Packer and machine images
+.packer.d/
+packer_cache/
+output-*/
+*.pkrvars.hcl
+!*.pkrvars.hcl.example
+*.qcow2
+*.raw
+*.vdi
+*.vhd
+*.vmdk
+*.ova
+*.box
+
+# Backups and runtime state
+backups/
+*.dump
+*.dump.age
+*.tar
+*.tar.gz
+*.age
+data/
+dist/
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/
+.venv/
+.ansible/
+.cache/
+*.swp

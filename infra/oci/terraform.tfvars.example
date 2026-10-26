@@ -1,0 +1,26 @@
+# Safety switch: leave false for validation and planning practice.
+enable_create = false
+
+# Fill these from your OCI tenancy only when ready to plan a deployment.
+tenancy_ocid     = "ocid1.tenancy.oc1..example"
+compartment_ocid = "ocid1.compartment.oc1..example"
+region           = "sa-saopaulo-1"
+
+# Copy the exact Ubuntu 24.04 ARM64 platform image OCID selected in the Console.
+# Do not rely on an automatically changing "latest" image during rebuilds.
+ubuntu_image_ocid = "ocid1.image.oc1.sa-saopaulo-1.example"
+
+# Public key only. Never put a private key in this repository.
+ssh_public_key = "ssh-ed25519 AAAA... operator"
+
+# Set to your current public IP /32 only for bootstrap, then remove after
+# Tailscale enrollment and re-apply. Never use 0.0.0.0/0.
+bootstrap_ssh_cidr = null
+
+control_ocpus     = 1
+control_memory_gb = 8
+vault_ocpus       = 1
+vault_memory_gb   = 4
+
+create_kms_key       = true
+create_backup_bucket = true

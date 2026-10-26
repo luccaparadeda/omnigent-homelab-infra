@@ -1,0 +1,84 @@
+name: omnigent-control-plane
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:?Set POSTGRES_IMAGE in .env}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - type: bind
+        source: ${OMNIGENT_DATA_ROOT:-/srv/omnigent}/postgres
+        target: /var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - backend
+
+  omnigent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BASE_IMAGE: ${OMNIGENT_BASE_IMAGE:?Set OMNIGENT_BASE_IMAGE in .env}
+    image: ${OMNIGENT_SERVER_IMAGE:?Set OMNIGENT_SERVER_IMAGE in .env}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      ARTIFACT_DIR: /data/artifacts
+      OMNIGENT_ADMIN_CREDENTIALS_PATH: /data/admin-credentials
+      OMNIGENT_AUTH_ENABLED: "1"
+      OMNIGENT_ACCOUNTS_BASE_URL: ${OMNIGENT_BASE_URL:?Set OMNIGENT_BASE_URL in .env}
+      OMNIGENT_ACCOUNTS_COOKIE_SECRET: ${OMNIGENT_ACCOUNTS_COOKIE_SECRET:?Set OMNIGENT_ACCOUNTS_COOKIE_SECRET in .env}
+      OMNIGENT_ACCOUNTS_INIT_ADMIN_PASSWORD: ${OMNIGENT_ACCOUNTS_INIT_ADMIN_PASSWORD:?Set OMNIGENT_ACCOUNTS_INIT_ADMIN_PASSWORD in .env}
+      OMNIGENT_CREDENTIAL_CIPHER: ${OMNIGENT_CREDENTIAL_CIPHER:-}
+      OMNIGENT_CREDENTIAL_VAULT_KEY: ${OMNIGENT_CREDENTIAL_VAULT_KEY:-}
+      OMNIGENT_CREDENTIAL_VAULT_MOUNT: ${OMNIGENT_CREDENTIAL_VAULT_MOUNT:-transit}
+      VAULT_ADDR: ${VAULT_ADDR:-}
+      VAULT_TOKEN: ${VAULT_TOKEN:-}
+      VAULT_CACERT: /run/secrets/vault-ca.crt
+      REQUESTS_CA_BUNDLE: /run/secrets/vault-ca.crt
+    volumes:
+      - type: bind
+        source: ${OMNIGENT_DATA_ROOT:-/srv/omnigent}/artifacts
+        target: /data/artifacts
+      - type: bind
+        source: ${OMNIGENT_DATA_ROOT:-/srv/omnigent}/admin-credentials
+        target: /data/admin-credentials
+      - type: bind
+        source: ${VAULT_CA_ROOT:-/etc/omnigent/vault-ca}/ca.crt
+        target: /run/secrets/vault-ca.crt
+        read_only: true
+    ports:
+      - ${OMNIGENT_BIND_IP:-127.0.0.1}:${OMNIGENT_PORT:-8000}:8000
+    healthcheck:
+      test:
+        - CMD
+        - /opt/venv/bin/python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 45s
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge

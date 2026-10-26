@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Omnigent encrypted logical backup
+
+[Timer]
+OnCalendar={{ omnigent_backup_calendar }}
+Persistent=true
+RandomizedDelaySec=20m
+
+[Install]
+WantedBy=timers.target

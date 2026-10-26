@@ -1,0 +1,12 @@
+# Use a versioned release URL, not /noble/current/, then fetch and verify that
+# release directory's SHA256SUMS and signature.
+ubuntu_image_url      = "https://cloud-images.ubuntu.com/noble/RELEASE/noble-server-cloudimg-amd64.img"
+ubuntu_image_release  = "REPLACE_WITH_RELEASE_ID"
+ubuntu_image_checksum = "sha256:REPLACE_WITH_64_HEX_CHARACTERS"
+
+# Generate a throwaway key for each image build and destroy it afterward.
+build_ssh_public_key       = "ssh-ed25519 AAAA... packer-ephemeral"
+build_ssh_private_key_file = "/absolute/path/outside/repository/packer_ed25519"
+
+# Linux/KVM: kvm. macOS/Apple Virtualization host: hvf. Portable emulation: tcg.
+accelerator = "kvm"

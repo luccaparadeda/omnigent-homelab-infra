@@ -1,0 +1,15 @@
+---
+vault_root: /opt/omnigent-vault
+vault_data_root: /srv/vault
+vault_tls_root: /etc/omnigent/vault/tls
+vault_start_services: false
+vault_image: "hashicorp/vault@sha256:962a92876e168d68eaaa24b0b8b49bbce1cb63024060a67bba95cd158a366fc2"
+vault_bind_ip: ""
+vault_api_addr: ""
+vault_cluster_addr: ""
+oci_kms_key_id: ""
+oci_kms_crypto_endpoint: ""
+oci_kms_management_endpoint: ""
+vault_tls_cert_src: ""
+vault_tls_key_src: ""
+vault_tls_ca_src: ""

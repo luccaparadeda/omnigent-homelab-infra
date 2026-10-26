@@ -1,0 +1,15 @@
+---
+omnigent_version: "0.19.1"
+omnigent_server_url: "https://omnigent-control.example.ts.net"
+
+# Subscription OAuth tokens are stored in the worker user's keyring. Rootful
+# Docker access would let a workload bypass that user-level isolation.
+omnigent_worker_allow_rootful_docker: false
+
+# Install and render configuration, but do not start services until these are
+# explicitly enabled in a private production inventory.
+control_plane_start_services: false
+vault_start_services: false
+
+# Tailscale is installed but never receives an auth key from this repository.
+install_tailscale: true

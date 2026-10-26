@@ -1,0 +1,85 @@
+---
+- name: Install worker build and Python tooling
+  ansible.builtin.apt:
+    name:
+      - build-essential
+      - dbus-user-session
+      - gnome-keyring
+      - libsecret-tools
+      - pipx
+      - python3-dev
+      - python3-venv
+    state: present
+
+- name: Create restricted worker account
+  ansible.builtin.user:
+    name: "{{ omnigent_worker_user }}"
+    home: "{{ omnigent_worker_home }}"
+    create_home: true
+    shell: /bin/bash
+
+- name: Set the worker account's complete supplemental group list
+  ansible.builtin.user:
+    name: "{{ omnigent_worker_user }}"
+    groups: "{{ 'docker' if omnigent_worker_allow_rootful_docker | bool else '' }}"
+    append: false
+
+- name: Create the system Codex policy directory
+  ansible.builtin.file:
+    path: /etc/codex
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Require fail-closed Codex keyring credential storage
+  ansible.builtin.copy:
+    dest: /etc/codex/requirements.toml
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      cli_auth_credentials_store = "keyring"
+
+- name: Read installed Omnigent CLI version
+  ansible.builtin.command: /usr/local/bin/omni --version
+  register: installed_omnigent_cli
+  changed_when: false
+  failed_when: false
+
+- name: Install pinned Omnigent CLI globally with pipx
+  ansible.builtin.command:
+    cmd: "pipx install --force omnigent=={{ omnigent_version }}"
+  changed_when: true
+  environment:
+    PIPX_HOME: "{{ omnigent_pipx_home }}"
+    PIPX_BIN_DIR: /usr/local/bin
+  when: omnigent_version not in installed_omnigent_cli.stdout
+
+- name: Create worker project root
+  ansible.builtin.file:
+    path: "{{ omnigent_worker_home }}/projects"
+    state: directory
+    owner: "{{ omnigent_worker_user }}"
+    group: "{{ omnigent_worker_user }}"
+    mode: "0750"
+
+- name: Record server endpoint without a credential
+  ansible.builtin.copy:
+    dest: /etc/omnigent-worker.conf
+    owner: root
+    group: "{{ omnigent_worker_user }}"
+    mode: "0640"
+    content: |
+      OMNIGENT_SERVER_URL={{ omnigent_server_url }}
+
+- name: Explain the required one-time enrollment
+  ansible.builtin.debug:
+    msg: >-
+      Worker packages and fail-closed Codex keyring policy are ready. After
+      unlocking this account's Secret Service interactively, sign in to the
+      Codex and Claude subscription CLIs, run `omni login
+      {{ omnigent_server_url }}`, test with
+      `omni host {{ omnigent_server_url }}`, then run `omni host enable`.
+      Subscription tokens and the resulting narrow host identity are
+      intentionally not baked into an image.

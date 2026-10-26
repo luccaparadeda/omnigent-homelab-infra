@@ -1,0 +1,8 @@
+---
+- name: Configure the Vault node
+  hosts: vault_nodes
+  become: true
+  roles:
+    - common
+    - docker_engine
+    - vault_node
