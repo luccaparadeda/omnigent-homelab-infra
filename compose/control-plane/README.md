@@ -11,6 +11,9 @@ This Compose file is an operator-owned equivalent of the documented Omnigent ser
 - Re-verify the pinned multi-architecture image digests during each planned version upgrade.
 - Do not publish port 8000 through an OCI public security-list rule.
 - Let the Ansible role create storage paths and install the Vault CA before starting the stack.
+- The bundled Vault Proxy authenticates with the control VM's OCI instance
+  principal, renews its short-lived token, and forces that token onto Transit
+  requests. Omnigent receives neither a Vault token nor OCI API key material.
 - Complete the admin bootstrap while access remains private.
 
 To parse the file without starting containers, run `make compose-config` at the repository root.

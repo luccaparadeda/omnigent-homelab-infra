@@ -4,6 +4,10 @@ vault_data_root: /srv/vault
 vault_tls_root: /etc/omnigent/vault/tls
 vault_start_services: false
 vault_image: "hashicorp/vault@sha256:962a92876e168d68eaaa24b0b8b49bbce1cb63024060a67bba95cd158a366fc2"
+# The pinned Alpine image creates its non-root vault account as 100:1000.
+# Re-verify these values whenever vault_image changes.
+vault_runtime_uid: "100"
+vault_runtime_gid: "1000"
 vault_bind_ip: ""
 vault_api_addr: ""
 vault_cluster_addr: ""
@@ -13,3 +17,9 @@ oci_kms_management_endpoint: ""
 vault_tls_cert_src: ""
 vault_tls_key_src: ""
 vault_tls_ca_src: ""
+vault_backup_enabled: false
+vault_backup_bucket: ""
+vault_backup_age_recipient: ""
+vault_backup_role: omnigent-vault-backup
+vault_backup_calendar: "*-*-* 03:41:00"
+oci_cli_version: "3.95.1"

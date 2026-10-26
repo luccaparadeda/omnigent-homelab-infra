@@ -11,5 +11,10 @@ omnigent_worker_allow_rootful_docker: false
 control_plane_start_services: false
 vault_start_services: false
 
+# The mobile and desktop apps connect to private HTTPS supplied by Tailscale
+# Serve. MagicDNS and HTTPS certificates must be enabled in the tailnet.
+omnigent_bind_ip: "127.0.0.1"
+omnigent_tailscale_serve_enabled: true
+
 # Tailscale is installed but never receives an auth key from this repository.
 install_tailscale: true

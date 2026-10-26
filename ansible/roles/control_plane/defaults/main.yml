@@ -7,7 +7,10 @@ omnigent_base_image: "ghcr.io/omnigent-ai/omnigent-server@sha256:b211b81fb739a7b
 omnigent_server_image: "local/omnigent-server-vault:0.19.1-hvac2.4.0"
 postgres_image: "postgres@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b"
 omnigent_port: 8000
-omnigent_bind_ip: ""
+# Tailscale Serve terminates private HTTPS and is the only network-facing path.
+omnigent_bind_ip: "127.0.0.1"
+omnigent_tailscale_serve_enabled: true
+omnigent_tailscale_serve_target: "http://127.0.0.1:8000"
 omnigent_base_url: ""
 omnigent_postgres_password: ""
 omnigent_accounts_cookie_secret: ""
@@ -16,7 +19,13 @@ omnigent_credential_cipher: vault
 omnigent_credential_vault_key: omnigent-credentials
 omnigent_credential_vault_mount: transit
 omnigent_vault_addr: ""
-omnigent_credential_vault_token: ""
+# Vault Proxy authenticates with the control VM's short-lived OCI instance
+# identity. Omnigent never receives or stores the resulting Vault token.
+omnigent_vault_proxy_image: "hashicorp/vault@sha256:962a92876e168d68eaaa24b0b8b49bbce1cb63024060a67bba95cd158a366fc2"
+omnigent_vault_proxy_role: omnigent-control
+omnigent_vault_proxy_auth_mount: auth/oci
+omnigent_vault_proxy_credential_poll_interval: 5m
+omnigent_vault_proxy_addr: http://vault-proxy:8100
 omnigent_vault_ca_src: ""
 omnigent_vault_ca_root: /etc/omnigent/vault-ca
 omnigent_backup_enabled: false

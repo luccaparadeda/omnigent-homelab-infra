@@ -44,32 +44,44 @@
   ansible.builtin.file:
     path: "{{ item.path }}"
     state: directory
-    owner: root
-    group: root
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
     mode: "{{ item.mode }}"
   loop:
-    - { path: "{{ vault_root }}/config", mode: "0750" }
-    - { path: "{{ vault_data_root }}/data", mode: "0700" }
-    - { path: "{{ vault_tls_root }}", mode: "0700" }
+    - { path: "{{ vault_root }}", owner: "root", group: "root", mode: "0750" }
+    - { path: "{{ vault_root }}/config", owner: "{{ vault_runtime_uid }}", group: "{{ vault_runtime_gid }}", mode: "0750" }
+    - { path: "{{ vault_root }}/policies", owner: "{{ vault_runtime_uid }}", group: "{{ vault_runtime_gid }}", mode: "0750" }
+    - { path: "{{ vault_data_root }}/data", owner: "{{ vault_runtime_uid }}", group: "{{ vault_runtime_gid }}", mode: "0700" }
+    - { path: "{{ vault_tls_root }}", owner: "{{ vault_runtime_uid }}", group: "{{ vault_runtime_gid }}", mode: "0750" }
 
-- name: Install reviewed Vault files
+- name: Install reviewed Vault Compose definition
   ansible.builtin.copy:
-    src: "{{ item.src }}"
-    dest: "{{ item.dest }}"
+    src: "{{ playbook_dir }}/../../compose/vault/compose.yaml"
+    dest: "{{ vault_root }}/compose.yaml"
     owner: root
     group: root
     mode: "0640"
+  notify: Restart Vault
+
+- name: Install Vault runtime configuration and policy
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: "{{ vault_runtime_uid }}"
+    group: "{{ vault_runtime_gid }}"
+    mode: "0640"
   loop:
-    - { src: "{{ playbook_dir }}/../../compose/vault/compose.yaml", dest: "{{ vault_root }}/compose.yaml" }
     - { src: "{{ playbook_dir }}/../../compose/vault/config/vault.hcl", dest: "{{ vault_root }}/config/vault.hcl" }
+    - { src: "{{ playbook_dir }}/../../compose/vault/policies/omnigent-transit.hcl", dest: "{{ vault_root }}/policies/omnigent-transit.hcl" }
+    - { src: "{{ playbook_dir }}/../../compose/vault/policies/vault-backup.hcl", dest: "{{ vault_root }}/policies/vault-backup.hcl" }
   notify: Restart Vault
 
 - name: Install Vault TLS material
   ansible.builtin.copy:
     src: "{{ item.src }}"
     dest: "{{ item.dest }}"
-    owner: root
-    group: root
+    owner: "{{ vault_runtime_uid }}"
+    group: "{{ vault_runtime_gid }}"
     mode: "{{ item.mode }}"
   loop:
     - { src: "{{ vault_tls_cert_src }}", dest: "{{ vault_tls_root }}/server.crt", mode: "0644" }
@@ -95,3 +107,75 @@
   register: vault_compose_up
   changed_when: "'Started' in vault_compose_up.stdout or 'Created' in vault_compose_up.stdout"
   when: vault_start_services | bool
+
+- name: Validate encrypted Vault snapshot settings
+  ansible.builtin.assert:
+    that:
+      - vault_backup_bucket | length > 0
+      - vault_backup_age_recipient | length > 0
+      - vault_backup_role | length > 0
+    fail_msg: "A bucket, age public recipient, and OCI auth role are required for Vault snapshots."
+  when: vault_backup_enabled | bool
+
+- name: Install Vault snapshot dependencies
+  ansible.builtin.apt:
+    name:
+      - age
+      - pipx
+    state: present
+  when: vault_backup_enabled | bool
+
+- name: Read installed OCI CLI version for Vault snapshots
+  ansible.builtin.command: /usr/local/bin/oci --version
+  register: vault_installed_oci_cli
+  changed_when: false
+  failed_when: false
+  when: vault_backup_enabled | bool
+
+- name: Install pinned OCI CLI for Vault snapshot uploads
+  ansible.builtin.command:
+    cmd: "pipx install --force oci-cli=={{ oci_cli_version }}"
+  changed_when: true
+  environment:
+    PIPX_HOME: /opt/oci-cli-pipx
+    PIPX_BIN_DIR: /usr/local/bin
+  when:
+    - vault_backup_enabled | bool
+    - oci_cli_version not in vault_installed_oci_cli.stdout
+
+- name: Install encrypted Vault snapshot script
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../scripts/backup-vault-raft.sh"
+    dest: /usr/local/sbin/omnigent-vault-backup
+    owner: root
+    group: root
+    mode: "0750"
+  when: vault_backup_enabled | bool
+
+- name: Install Vault snapshot systemd service
+  ansible.builtin.template:
+    src: backup.service.j2
+    dest: /etc/systemd/system/omnigent-vault-backup.service
+    owner: root
+    group: root
+    mode: "0644"
+  when: vault_backup_enabled | bool
+  notify: Reload systemd
+
+- name: Install Vault snapshot systemd timer
+  ansible.builtin.template:
+    src: backup.timer.j2
+    dest: /etc/systemd/system/omnigent-vault-backup.timer
+    owner: root
+    group: root
+    mode: "0644"
+  when: vault_backup_enabled | bool
+  notify: Reload systemd
+
+- name: Enable encrypted Vault snapshot timer
+  ansible.builtin.systemd_service:
+    name: omnigent-vault-backup.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: vault_backup_enabled | bool

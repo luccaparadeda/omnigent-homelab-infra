@@ -4,7 +4,6 @@
 # Never commit plaintext secrets or the Ansible Vault password.
 
 omnigent_postgres_password: "CHANGE_ME"
-omnigent_credential_vault_token: "CHANGE_ME"
 
 # OCI KMS identifiers are not secret, but are deployment-specific.
 oci_kms_key_id: "ocid1.key.oc1..example"

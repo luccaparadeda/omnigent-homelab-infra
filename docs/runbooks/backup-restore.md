@@ -21,6 +21,33 @@ After applying the control-plane role, test the timer and verify that both a
 `logical/*.dump.age` object and its matching `application/*.tar.age` object exist.
 Never log or retain an unencrypted dump/archive.
 
+## Enable encrypted Vault Raft snapshots
+
+First apply `compose/vault/policies/vault-backup.hcl` and create the
+`omnigent-vault-backup` OCI auth role as described in the provisioning
+runbook. Grant the Vault VM's instance principal permission to upload objects
+only to the backup bucket. Then set:
+
+```yaml
+vault_backup_enabled: true
+vault_backup_bucket: omnigent-homelab-backups
+vault_backup_age_recipient: age1PUBLIC_RECIPIENT
+```
+
+Apply the Vault role, start a supervised run, and confirm an encrypted object
+appears under `vault-raft/`:
+
+```bash
+sudo systemctl start omnigent-vault-backup.service
+sudo systemctl status omnigent-vault-backup.service
+sudo systemctl list-timers omnigent-vault-backup.timer
+```
+
+The job authenticates with the Vault VM's OCI instance principal, creates the
+snapshot inside the Vault container, copies it to a private temporary
+directory, encrypts it with the offline `age` recipient, uploads it, and
+removes local plaintext on exit.
+
 ## Create a reviewed boot backup
 
 The helper is dry-run by default:
@@ -42,10 +69,7 @@ Add `--execute` only after checking current backup count and free-tier usage.
 5. Enroll a temporary worker and execute a harmless task.
 6. Record RPO/RTO and securely remove the test environment.
 
-Vault Raft snapshots are a separate required recovery stream. They are not yet
-automated by this repository because the snapshot job needs a narrowly scoped
-Vault token and bucket access for the Vault instance principal. Do not call the
-deployment recoverable until an encrypted off-node Raft snapshot and restore
-have both been tested.
+Do not call the deployment recoverable until an encrypted off-node Raft
+snapshot and restore have both been tested.
 
 Vault recovery depends on the OCI KMS key. Do not delete or schedule deletion of that key without an explicit seal-migration and restore plan.

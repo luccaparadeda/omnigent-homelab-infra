@@ -21,6 +21,10 @@ services:
         target: /vault/config
         read_only: true
       - type: bind
+        source: ./policies
+        target: /vault/policies
+        read_only: true
+      - type: bind
         source: ${VAULT_DATA_ROOT:-/srv/vault}/data
         target: /vault/file
       - type: bind
