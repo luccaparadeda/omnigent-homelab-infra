@@ -16,15 +16,15 @@ credentials and does not deploy from CI.
                                   private VPN
                            Tailscale by default
 
-  phone / browser ────────────── Omnigent control plane (OCI)
+  phone / browser ────────────── Omnigent control plane (OCI E2 Micro)
                                       │
-                                      ├── PostgreSQL + artifacts
+                                      ├── persistent SQLite + artifacts
                                       ├── MCP registry / gateway
                                       └── encrypted credential records
                                                    │
                                              Vault Transit
-                                                   │
-                                           OCI KMS auto-unseal
+                                        (second OCI E2 Micro,
+                                           manual unseal)
 
                          encrypted runner tunnels
                                │             │
@@ -34,9 +34,15 @@ credentials and does not deploy from CI.
                         CLI keyring      CLI keyring
 ```
 
-Omnigent and Vault stay on separate Oracle VMs. The current Always Free allocation is exactly 2 OCPUs / 12 GB across both Ampere A1 instances: 1 OCPU / 8 GB for the control plane and 1 OCPU / 4 GB for Vault.
+Omnigent and Vault stay on separate Oracle VMs. The live deployment uses two
+AMD64 `VM.Standard.E2.1.Micro` instances, each with 1 OCPU, 1 GB RAM, and a
+45 GB boot disk. The unavailable Ampere A1 design is retained only as research,
+not described as deployed capacity.
 
-For the first deployment, create the scarce Always Free instances in the Oracle Console and give Ansible their private Tailscale addresses. The current OpenTofu skeleton remains an optional local path. The researched steady-state target is an OCI Resource Manager Terraform stack after the manual topology has been proven; everything above the base VM remains the same.
+The VMs were created manually in the Oracle Console and are configured through
+their private Tailscale addresses. OpenTofu remains an optional, disabled-by-
+default path for a future reproducible VM lifecycle; Ansible is authoritative
+for the current host configuration.
 
 ## Golden build model
 
@@ -44,9 +50,12 @@ The word *image* means a reproducible, credential-free build:
 
 - `images/worker/autoinstall/`: primary credential-free Ubuntu installer seed for the dedicated bare-metal home worker.
 - `images/worker/worker.pkr.hcl`: optional QEMU/KVM image for testing or a future virtual worker.
-- `images/vps/`: cloud-init baseline applied to Oracle Ubuntu ARM64 instances.
-- `compose/control-plane/`: pinned Omnigent/PostgreSQL application layer.
-- `compose/vault/`: Vault Transit service, auto-unsealed by OCI KMS.
+- `images/vps/`: architecture-neutral cloud-init baseline for Oracle Ubuntu
+  instances.
+- `compose/control-plane/`: pinned Omnigent application layer with a low-memory
+  SQLite profile and an optional PostgreSQL profile.
+- `compose/vault/`: Vault Transit service with the current manual-unseal profile
+  and an optional future OCI KMS profile.
 - `infra/oci/`: reviewed OpenTofu inputs and topology skeleton. It is not applied automatically.
 
 OCI recovery then adds a boot-volume backup after the baseline passes validation. Secrets are enrolled after imaging and are never baked into an image.
@@ -59,15 +68,15 @@ password-unlocked OS keyring; managed MCP credentials remain server-side.
 
 | Area | Status | Important boundary |
 |---|---|---|
-| Source repository | MIT-licensed and prepared for public GitHub hosting | No infrastructure deployment workflow exists |
+| Source repository | MIT-licensed GitHub repository with validation and tag-release workflows | CI holds no deployment credentials and cannot deploy infrastructure |
 | Bare-metal home worker | Guarded autoinstall seed + Ansible role validated | Not installed; storage selection remains deliberately interactive |
 | Worker QEMU definition | Packer 1.16.2 format/syntax passed | Image not built; versioned source checksum, QEMU, and ephemeral build key are required |
-| VPS cloud-init baseline | OpenTofu 1.13.0 schema validated | No VM launched |
-| Omnigent Compose stack | Compose parsed; ARM64 Vault-enabled image built and import-smoked | No service started |
-| Vault Compose stack | Compose parsed | Not initialized; no recovery material exists |
-| OCI OpenTofu | Provider/schema validated | `enable_create=false` by default; no plan/apply performed |
-| Ansible roles | Syntax validated with Core 2.21.5 | No host contacted |
-| Backup/restore | Encrypted PostgreSQL + application-state job defined | No bucket or backup created; Vault Raft snapshot automation remains a deployment gate |
+| Oracle VMs | Two E2 Micro nodes created manually in São Paulo | Public SSH closure is still a completion gate |
+| Omnigent control plane | Version 0.19.1 healthy over private Tailscale HTTPS with persistent SQLite | Full restart and restore drill remains pending |
+| Vault credential plane | Transit and restricted AppRole path active; Vault currently unsealed | Manual unseal is required after reboot; recovery drill remains pending |
+| Laptop worker | Persistent daemon runs and its tunnel log records a connection; the unauthenticated CLI status probe receives HTTP 401 | Codex startup workaround verified, but secure subscription credential delivery is blocked on macOS 0.19.1 |
+| OCI OpenTofu | Provider/schema validated | `enable_create=false`; it did not create the manual live VMs |
+| Backup/restore | Encrypted backup jobs defined | Age recipient, off-host bucket, and restore evidence are not configured |
 
 ## Quick start for repository development
 
@@ -94,21 +103,22 @@ SHA-256 checksums, an SPDX JSON SBOM, and GitHub artifact attestations. It has n
 OCI, Vault, Tailscale, or worker credentials. See
 [the release guide](docs/maintainers/releases.md).
 
-## Before any deployment
+## Remaining rollout gates
 
-1. Confirm the CPU architecture and operating system of the home PC and laptop.
-2. Confirm the Oracle tenancy home region, availability domain, and Always Free capacity.
-3. Re-verify the pinned multi-architecture container digests for the planned release.
-4. Use the default Tailscale private-HTTPS path, or explicitly configure the
-   documented native WireGuard overrides and a trusted private HTTPS proxy.
-5. Create or select an OCI compartment, then review IAM, KMS, Object Storage, and backup retention.
-6. Install the dedicated worker with full-disk encryption from the guarded
+1. Close public SSH only after private Tailscale SSH and a recovery path have
+   both been re-verified.
+2. Configure an age recipient and off-host backup destination, then complete
+   SQLite and Vault Raft restore drills.
+3. Reboot both Oracle nodes, manually unseal Vault, and verify Omnigent health,
+   private HTTPS, and credential operations after recovery.
+4. Install the dedicated worker with full-disk encryption from the guarded
    autoinstall seed, apply Ansible twice, and verify that it contains no
    credential material or rootful Docker access for the worker user.
-7. After boot, unlock the OS keyring interactively and enroll Codex and Claude
-   subscription sessions locally. Deploy the control plane privately, then
-   enroll managed MCP credentials through the Omnigent UI.
-8. Complete the backup and restore drill before enabling unattended schedules.
+5. After boot, unlock the Linux worker keyring interactively and enroll Codex
+   and Claude subscription sessions locally.
+6. Resolve the documented macOS Omnigent/Codex credential-broker gate before
+   allowing unattended Codex work on the laptop.
+7. Run a real agent session on each approved worker before enabling schedules.
 
 See [architecture.md](docs/architecture.md) and the runbooks under [docs/runbooks](docs/runbooks/).
 

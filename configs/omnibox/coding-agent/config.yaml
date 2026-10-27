@@ -1,0 +1,48 @@
+spec_version: 1
+name: sandboxed_coding_agent
+description: Credential-minimized Codex worker profile for Linux and macOS.
+
+prompt: |
+  Work only inside the current repository. Inspect before editing, keep changes
+  scoped to the request, and run the smallest relevant validation before
+  reporting completion.
+
+executor:
+  type: omnigent
+  config:
+    harness: codex
+
+os_env:
+  type: caller_process
+  cwd: .
+  sandbox: &worker_sandbox
+    # Resolves to Bubblewrap + seccomp on Linux and Seatbelt on macOS.
+    # Omnigent fails closed if the requested platform backend is unavailable.
+    type: auto
+    write_paths:
+      - .
+    cwd_allow_hidden:
+      - .git
+      - .venv
+    cwd_hidden_scan_recursive: true
+    cwd_hidden_scan_max_entries: 200000
+    cwd_hidden_scan_overflow: error
+    mask_paths:
+      - .env
+      - .env.local
+      - .env.production
+      - .aws
+      - .ssh
+      - .config/gcloud
+      - config/production.key
+    # Compatibility baseline for subscription-authenticated Codex. Replace
+    # this with reviewed per-project egress_rules before unattended execution.
+    allow_network: true
+
+terminals:
+  shell:
+    command: /bin/sh
+    os_env:
+      type: caller_process
+      cwd: .
+      sandbox: *worker_sandbox

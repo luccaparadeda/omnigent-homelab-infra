@@ -1,0 +1,47 @@
+name: omnigent-vault
+
+services:
+  vault:
+    image: ${VAULT_IMAGE:?Set VAULT_IMAGE in .env}
+    restart: unless-stopped
+    # The official image entrypoint already adds -config=/vault/config.
+    command: server
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_ADDR: http://127.0.0.1:8200
+      VAULT_API_ADDR: ${VAULT_API_ADDR:?Set VAULT_API_ADDR in .env}
+      VAULT_CLUSTER_ADDR: ${VAULT_CLUSTER_ADDR:?Set VAULT_CLUSTER_ADDR in .env}
+    volumes:
+      - type: bind
+        source: ./config
+        target: /vault/config
+        read_only: true
+      - type: bind
+        source: ./policies
+        target: /vault/policies
+        read_only: true
+      - type: bind
+        source: ${VAULT_DATA_ROOT:-/srv/vault}/data
+        target: /vault/file
+    tmpfs:
+      - /vault/snapshots:size=128m,mode=0700,uid=100,gid=1000
+    ports:
+      - ${VAULT_BIND_IP:?Set VAULT_BIND_IP in .env}:8200:8200
+      - ${VAULT_BIND_IP:?Set VAULT_BIND_IP in .env}:8201:8201
+    healthcheck:
+      test:
+        - CMD
+        - vault
+        - status
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    mem_limit: 512m
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      core:
+        soft: 0
+        hard: 0

@@ -17,15 +17,16 @@
       - control_private_ip | length > 0
       - omnigent_base_url | length > 0
       - omnigent_base_url is match('^https://')
-      - omnigent_postgres_password | length >= 24
-      - omnigent_postgres_password is match('^[A-Za-z0-9._~-]+$')
+      - omnigent_database_url | length > 0 or omnigent_postgres_password | length >= 24
       - omnigent_accounts_cookie_secret | length >= 32
       - omnigent_accounts_cookie_secret is match('^[A-Za-z0-9._~-]+$')
       - omnigent_accounts_init_admin_password | length >= 16
       - omnigent_accounts_init_admin_password is match('^[A-Za-z0-9._~-]+$')
       - omnigent_vault_addr | length > 0
       - omnigent_vault_proxy_role | length > 0
-      - omnigent_vault_ca_src | length > 0
+      - omnigent_vault_proxy_auth_mount == 'auth/approle' or omnigent_vault_ca_src | length > 0
+      - omnigent_vault_proxy_auth_mount != 'auth/approle' or omnigent_vault_role_id_src | length > 0
+      - omnigent_vault_proxy_auth_mount != 'auth/approle' or omnigent_vault_secret_id_src | length > 0
     fail_msg: "Private networking and URL-safe deployment secrets must be supplied before starting Omnigent."
   when: control_plane_start_services | bool
   no_log: true
@@ -43,6 +44,68 @@
     - { path: "{{ control_plane_data_root }}/artifacts", mode: "0750", owner: "10001", group: "10001" }
     - { path: "{{ control_plane_data_root }}/admin-credentials", mode: "0700", owner: "10001", group: "10001" }
     - { path: "{{ omnigent_vault_ca_root }}", mode: "0750" }
+    - { path: "{{ omnigent_vault_approle_root }}", mode: "0750", owner: "100", group: "1000" }
+
+- name: Inspect the control-plane swap file
+  ansible.builtin.stat:
+    path: /swapfile
+  register: control_plane_swapfile
+  when: control_plane_swap_size_mb | int > 0
+
+- name: Allocate the low-memory control-plane swap file
+  ansible.builtin.command:
+    cmd: "fallocate -l {{ control_plane_swap_size_mb }}M /swapfile"
+  when:
+    - control_plane_swap_size_mb | int > 0
+    - not control_plane_swapfile.stat.exists
+  changed_when: true
+
+- name: Protect the control-plane swap file
+  ansible.builtin.file:
+    path: /swapfile
+    owner: root
+    group: root
+    mode: "0600"
+  when: control_plane_swap_size_mb | int > 0
+
+- name: Format the new control-plane swap file
+  ansible.builtin.command: mkswap /swapfile
+  when:
+    - control_plane_swap_size_mb | int > 0
+    - not control_plane_swapfile.stat.exists
+  changed_when: true
+
+- name: Persist the control-plane swap file
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    line: "/swapfile none swap sw 0 0"
+    regexp: '^/swapfile\s'
+    state: present
+  when: control_plane_swap_size_mb | int > 0
+
+- name: Read active control-plane swap devices
+  ansible.builtin.command: swapon --show=NAME --noheadings
+  register: control_plane_active_swap
+  changed_when: false
+  when: control_plane_swap_size_mb | int > 0
+
+- name: Enable the control-plane swap file
+  ansible.builtin.command: swapon /swapfile
+  when:
+    - control_plane_swap_size_mb | int > 0
+    - "'/swapfile' not in control_plane_active_swap.stdout_lines"
+  changed_when: true
+
+- name: Keep low-memory swapping conservative
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/61-omnigent-control-memory.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      vm.swappiness = 10
+  when: control_plane_swap_size_mb | int > 0
+  notify: Reload control-plane sysctl
 
 - name: Install backup tooling
   ansible.builtin.apt:
@@ -77,12 +140,30 @@
     owner: root
     group: root
     mode: "0644"
-  when: control_plane_start_services | bool
+  when:
+    - control_plane_start_services | bool
+    - omnigent_vault_proxy_auth_mount != 'auth/approle'
   notify: Restart control plane
+
+- name: Install the Vault AppRole identity for the local proxy
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: "100"
+    group: "1000"
+    mode: "0400"
+  loop:
+    - { src: "{{ omnigent_vault_role_id_src }}", dest: "{{ omnigent_vault_approle_root }}/role-id" }
+    - { src: "{{ omnigent_vault_secret_id_src }}", dest: "{{ omnigent_vault_approle_root }}/secret-id" }
+  when:
+    - control_plane_start_services | bool
+    - omnigent_vault_proxy_auth_mount == 'auth/approle'
+  notify: Restart control plane
+  no_log: true
 
 - name: Install reviewed control-plane Compose definition
   ansible.builtin.copy:
-    src: "{{ playbook_dir }}/../../compose/control-plane/compose.yaml"
+    src: "{{ control_plane_compose_src }}"
     dest: "{{ control_plane_root }}/compose.yaml"
     owner: root
     group: root
@@ -104,7 +185,7 @@
 
 - name: Install Vault Proxy configuration
   ansible.builtin.template:
-    src: vault-proxy.hcl.j2
+    src: "{{ control_plane_vault_proxy_template }}"
     dest: "{{ control_plane_root }}/vault-proxy.hcl"
     owner: root
     group: root
@@ -113,13 +194,14 @@
 
 - name: Render secret control-plane environment
   ansible.builtin.template:
-    src: env.j2
+    src: "{{ control_plane_env_template }}"
     dest: "{{ control_plane_root }}/.env"
     owner: root
     group: root
     mode: "0600"
   notify: Restart control plane
   no_log: true
+  when: control_plane_start_services | bool
 
 - name: Start control-plane services after explicit enablement
   ansible.builtin.command:

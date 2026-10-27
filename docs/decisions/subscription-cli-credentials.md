@@ -1,7 +1,8 @@
 # Subscription CLI credential decision
 
 Date: 2026-10-26
-Status: accepted design; live worker behavior still requires acceptance testing
+Status: accepted Linux design; macOS Omnigent 0.19.1 is blocked at the
+credential-delivery gate
 
 ## Decision
 
@@ -27,6 +28,25 @@ are encrypted with Vault Transit.
   worker can operate unattended until the machine or keyring is locked again.
 - Use a distinct Omnigent host identity, private-network identity, Git identity,
   and keyring on each worker.
+
+These controls are the Linux golden path. On the current macOS laptop, Codex
+stores the existing subscription session in `~/.codex/auth.json`, and Omnigent
+creates a different private `CODEX_HOME` for each session. Codex's keyring key
+is derived from the canonical `CODEX_HOME`, so enabling keyring storage for the
+normal home does not make that credential available to each private home.
+
+Testing Omnigent 0.19.1 with Codex 0.154.0 established two independent facts:
+
+1. a shared `memories_1.sqlite` symlink prevents app-server startup through
+   Seatbelt; keeping memory session-local fixes startup;
+2. after that fix, Codex reports no account unless the Seatbelt profile grants
+   the real `auth.json` read access.
+
+That file permission would also be available to an agent-created subprocess,
+so it is not an acceptable credential broker. The repository deliberately
+leaves the path blocked. Do not mark the Mac as an approved unattended Codex
+worker until Omnigent can broker native subscription auth, or another upstream
+mechanism passes both the model-turn and credential-exfiltration tests.
 
 ## Limit that cannot be engineered away
 
@@ -59,6 +79,8 @@ project ownership are tested together.
 - Confirm the worker account is absent from the `docker` group.
 - Revoke both subscription sessions and the Omnigent host identity during a
   recovery drill.
+- On macOS, prove a real Codex turn works while a shell in the same Omnibox
+  session cannot read or retrieve the native subscription credential.
 
 ## Primary references
 

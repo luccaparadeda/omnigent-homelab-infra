@@ -4,9 +4,14 @@ Nothing in this repository applies infrastructure automatically. Choose one Orac
 
 ## Path A — create Oracle nodes manually
 
-1. In the tenancy **home region**, create two Ubuntu 24.04 ARM64 `VM.Standard.A1.Flex` instances.
-2. Allocate control as 1 OCPU / 8 GB and Vault as 1 OCPU / 4 GB.
-3. Use a 50 GB boot disk on each and confirm **Always Free eligible** in the Console.
+The live path uses the capacity that was available in the tenancy; the
+preferred A1 shape was unavailable.
+
+1. In the tenancy home region, create two Ubuntu 24.04 AMD64
+   `VM.Standard.E2.1.Micro` instances.
+2. Assign one to Omnigent and one to Vault. Each live node has 1 OCPU, 1 GB RAM,
+   and a 45 GB boot disk.
+3. Confirm **Always Free eligible** in the Console before creating each VM.
 4. Add only your public SSH key. Never paste a private key or service credential into cloud-init.
 5. Permit SSH temporarily from your current public `/32`; do not open 8000, 8200, or 8201.
 6. SSH to each host, wait for `cloud-init status --wait`, install/enroll Tailscale, and verify SSH via the Tailscale address.
@@ -23,45 +28,22 @@ set `omnigent_bind_ip` to the control node's WireGuard address, and configure a
 trusted HTTPS reverse proxy on that private interface. Do not expose port 8000
 directly or use an HTTP URL for the mobile app.
 
-## Configure OCI identities for Vault
+## Configure Vault identity
 
-Create two narrowly matched dynamic groups:
+The current E2 Micro profile uses manual Shamir unseal and a least-privilege
+AppRole. It does not require OCI dynamic groups or KMS. Follow
+`docs/runbooks/live-deployment-plan.md`, render the manual Vault profile, and
+place the control-plane AppRole ID and secret ID only in root-readable runtime
+files. The local Vault Proxy exchanges them for renewable short-lived tokens.
 
-- `omnigent-vault-node`: only the Vault instance OCID.
-- `omnigent-control-node`: only the control instance OCID.
+During initialization, transfer recovery keys directly to the approved offline
+password manager and revoke the initial root token after durable operator
+access exists. Never put either value on a command line, in shell history, in
+Ansible inventory, or in this repository.
 
-The Vault-node dynamic group needs permission to use only the selected OCI KMS
-key. Vault's OCI auth plugin also needs the documented tenancy-level
-`AUTHENTICATION_INSPECT` and `GROUP_MEMBERSHIP_INSPECT` permissions. The
-control-node group exists so Vault can bind its OCID to the `omnigent-control`
-role; it receives no KMS permission.
-
-After Vault initialization, run these from the Vault node with a temporary
-initialization token in the environment. Read it without echoing, preserve it
-only across `sudo`, and replace both placeholder OCIDs:
-
-```bash
-cd /opt/omnigent-vault
-read -rsp "Temporary Vault initialization token: " VAULT_TOKEN
-export VAULT_TOKEN
-sudo --preserve-env=VAULT_TOKEN docker compose exec -T -e VAULT_TOKEN vault vault secrets enable transit
-sudo --preserve-env=VAULT_TOKEN docker compose exec -T -e VAULT_TOKEN vault vault write transit/keys/omnigent-credentials derived=true
-sudo --preserve-env=VAULT_TOKEN docker compose exec -T -e VAULT_TOKEN vault vault policy write omnigent-transit /vault/policies/omnigent-transit.hcl
-sudo --preserve-env=VAULT_TOKEN docker compose exec -T -e VAULT_TOKEN vault vault policy write vault-backup /vault/policies/vault-backup.hcl
-sudo --preserve-env=VAULT_TOKEN docker compose exec -T -e VAULT_TOKEN vault vault auth enable oci
-sudo --preserve-env=VAULT_TOKEN docker compose exec -T -e VAULT_TOKEN vault vault write auth/oci/config home_tenancy_id="TENANCY_OCID"
-sudo --preserve-env=VAULT_TOKEN docker compose exec -T -e VAULT_TOKEN vault vault write auth/oci/role/omnigent-control \
-  token_policies="omnigent-transit" token_no_default_policy=true token_ttl="1h" \
-  ocid_list="CONTROL_DYNAMIC_GROUP_OCID"
-sudo --preserve-env=VAULT_TOKEN docker compose exec -T -e VAULT_TOKEN vault vault write auth/oci/role/omnigent-vault-backup \
-  token_policies="vault-backup" token_no_default_policy=true token_ttl="15m" \
-  ocid_list="VAULT_DYNAMIC_GROUP_OCID"
-unset VAULT_TOKEN
-```
-
-Do not put the initialization token on the command line or in shell history.
-Export it only for the supervised bootstrap session, create durable operator
-access, then revoke it.
+The optional OCI KMS profile remains available for a future deployment. If it
+is selected, separately review dynamic groups, narrowly scoped IAM, KMS cost,
+key deletion protection, and seal migration before changing the live node.
 
 ## Path B — create Oracle nodes with OpenTofu
 

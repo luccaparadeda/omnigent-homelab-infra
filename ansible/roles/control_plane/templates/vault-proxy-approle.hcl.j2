@@ -1,0 +1,24 @@
+vault {
+  address = "{{ omnigent_vault_addr }}"
+}
+auto_auth {
+  method "approle" {
+    mount_path = "{{ omnigent_vault_proxy_auth_mount }}"
+    config = {
+      role_id_file_path                 = "/vault/auth/role-id"
+      secret_id_file_path               = "/vault/auth/secret-id"
+      remove_secret_id_file_after_reading = false
+    }
+  }
+}
+
+api_proxy {
+  use_auto_auth_token = "force"
+}
+
+listener "tcp" {
+  # Reachable only through the dedicated local Docker bridge. It is not bound
+  # to the VM's public, OCI-private, or Tailscale addresses.
+  address     = "172.30.255.1:8100"
+  tls_disable = true
+}

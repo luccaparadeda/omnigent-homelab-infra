@@ -15,7 +15,9 @@ plan, backups, and local policy before applying any release.
 ## Trust boundaries
 
 - The Oracle Omnigent server stores session history, artifacts, account state, and encrypted integration credentials.
-- HashiCorp Vault Transit protects the encryption keys used by Omnigent. OCI KMS protects Vault's auto-unseal material.
+- HashiCorp Vault Transit protects the encryption keys used by Omnigent. The
+  current free profile uses Shamir recovery keys and manual unseal; optional
+  OCI KMS auto-unseal is a separate future profile.
 - The home PC and laptop are execution hosts. Project files and native harness processes live on those machines.
 - Managed MCP calls are routed through the server gateway so their upstream credentials do not need to be copied to workers.
 - Native Claude/Codex subscription OAuth logins are host-local. This design
@@ -38,8 +40,10 @@ Never commit:
 - Use a private VPN and keep Omnigent authentication enabled as a second boundary.
 - Use separate revocable identities for the home PC and laptop.
 - Store native subscription credentials only in a password-unlocked OS keyring
-  on a full-disk-encrypted worker. Codex is configured to fail closed rather
-  than fall back to a plaintext file.
+  on a full-disk-encrypted worker. The Linux golden configuration makes Codex
+  fail closed rather than fall back to a plaintext file. The current macOS
+  laptop has a separate Omnigent 0.19.1 compatibility gate: do not expose a
+  host `auth.json` to an Omnibox session and call that keyring isolation.
 - Do not grant the subscription-authenticated worker account membership in the
   rootful Docker group. Rootless containers require a separate compatibility
   test before use.

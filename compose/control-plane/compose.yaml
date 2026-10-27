@@ -85,6 +85,7 @@ services:
   vault-proxy:
     image: ${VAULT_PROXY_IMAGE:?Set VAULT_PROXY_IMAGE in .env}
     restart: unless-stopped
+    entrypoint: /bin/vault
     command: proxy -config=/vault/proxy/config.hcl
     environment:
       VAULT_ADDR: ${VAULT_UPSTREAM_ADDR:?Set VAULT_UPSTREAM_ADDR in .env}
@@ -113,8 +114,8 @@ services:
       test:
         - CMD-SHELL
         - >-
-          VAULT_ADDR=http://127.0.0.1:8100 vault read -format=json
-          "$${VAULT_TRANSIT_MOUNT}/keys/$${VAULT_TRANSIT_KEY}" >/dev/null
+          wget -q -O /dev/null
+          "http://127.0.0.1:8100/v1/$${VAULT_TRANSIT_MOUNT}/keys/$${VAULT_TRANSIT_KEY}"
       interval: 10s
       timeout: 5s
       retries: 30
