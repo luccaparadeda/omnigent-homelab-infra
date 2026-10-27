@@ -4,6 +4,8 @@ omnigent_worker_user: omnigent-worker
 omnigent_worker_home: /var/lib/omnigent-worker
 omnigent_pipx_home: /opt/omnigent-pipx
 omnigent_server_url: ""
+omnigent_worker_config_dir: /etc/omnigent-worker
+omnigent_worker_omnibox_profile_path: /etc/omnigent-worker/omnibox-base.yaml
 
 # Rootful Docker group membership is root-equivalent and defeats Unix-user and
 # keyring isolation. Keep it disabled for subscription-authenticated workers.

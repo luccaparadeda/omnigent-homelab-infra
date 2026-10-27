@@ -4,7 +4,8 @@ services:
   vault:
     image: ${VAULT_IMAGE:?Set VAULT_IMAGE in .env}
     restart: unless-stopped
-    command: server -config=/vault/config/vault.hcl
+    # The official image entrypoint already adds -config=/vault/config.
+    command: server
     cap_add:
       - IPC_LOCK
     environment:

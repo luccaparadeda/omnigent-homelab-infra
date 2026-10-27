@@ -1,0 +1,52 @@
+spec_version: 1
+name: sandboxed_coding_agent_macos
+description: Credential-minimized Codex worker profile for the macOS laptop.
+
+prompt: |
+  Work only inside the current repository. Inspect before editing, keep changes
+  scoped to the request, and run the smallest relevant validation before
+  reporting completion.
+
+executor:
+  type: omnigent
+  config:
+    harness: codex
+
+os_env:
+  type: caller_process
+  cwd: .
+  sandbox: &worker_sandbox
+    type: darwin_seatbelt
+    read_paths:
+      # This install uses the standalone Codex binary shipped for the user.
+      # Verify `readlink ~/.local/bin/codex` before reusing on another Mac.
+      - ~/.local/bin
+      - ~/.codex/packages/standalone/current
+      # Non-secret compatibility reads required by Codex 0.154 on macOS.
+      - ~/.CFUserTextEncoding
+      - ~/.codex/ollama-launch-models.json
+    write_paths:
+      - .
+    cwd_allow_hidden:
+      - .git
+      - .venv
+    cwd_hidden_scan_recursive: true
+    cwd_hidden_scan_max_entries: 200000
+    cwd_hidden_scan_overflow: error
+    mask_paths:
+      - .env
+      - .env.local
+      - .env.production
+      - .aws
+      - .ssh
+      - .config/gcloud
+      - config/production.key
+    allow_network: true
+
+terminals:
+  shell:
+    command: /bin/sh
+    os_env:
+      type: caller_process
+      cwd: .
+      sandbox: *worker_sandbox

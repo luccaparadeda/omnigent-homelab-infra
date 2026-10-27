@@ -4,10 +4,11 @@
 
 ### Omnigent control plane
 
-The control plane runs on Oracle Ubuntu ARM64 and contains:
+The current control plane runs on an Oracle Ubuntu AMD64 E2 Micro and contains:
 
 - Omnigent server and web application
-- PostgreSQL
+- persistent SQLite for the 1 GB live profile; PostgreSQL remains an optional
+  larger-host profile
 - Session artifacts
 - MCP registry/gateway integration target (upstream feature; deployment configuration still requires a live acceptance test)
 - Encrypted credential records
@@ -25,15 +26,20 @@ loopback without Tailscale Serve or another proxy is intentionally unreachable.
 
 ### Secrets plane
 
-HashiCorp Vault runs as a separate logical service and exposes only the Transit operations needed by Omnigent. Its Transit key must be created with `derived=true`. Vault uses OCI KMS auto-unseal with an instance principal; no OCI API private key is baked into the VM.
+HashiCorp Vault runs on the second AMD64 E2 Micro and exposes only the Transit
+operations needed by Omnigent. Its Transit key is created with `derived=true`.
+The free live profile uses integrated Raft storage and manual Shamir unseal, so
+it has no paid KMS dependency and needs an operator after a Vault-node reboot.
+OCI KMS auto-unseal remains an optional future profile; no OCI API private key
+is baked into either VM.
 
 The Omnigent database holds ciphertext. Vault holds the encryption key. During a legitimate request, the Omnigent server can ask Vault to decrypt a credential for its owning workspace, user, provider, and account context. Vault therefore improves key separation and encryption at rest, but it does not make a live, fully compromised Omnigent server harmless.
 
-A Vault Proxy sidecar on the control node authenticates through Vault's OCI
-auth method using the VM's automatically rotated instance principal. It
+A Vault Proxy sidecar on the control node authenticates with a least-privilege
+AppRole whose role ID and secret ID are held in root-readable runtime files. It
 renews the short-lived Vault token and forces that token onto requests sent by
-Omnigent. No static Vault token or OCI API private key is stored in the
-Omnigent container, Compose environment, or Ansible inventory.
+Omnigent. No long-lived Vault token is stored in the Omnigent container,
+Compose environment, or Ansible inventory.
 
 ### Execution workers
 
@@ -49,6 +55,27 @@ containment boundary. Its subscription-authenticated worker account is not a
 member of the rootful Docker group: that privilege would allow an agent to
 become root and bypass user/keyring isolation. Personal files, daily-use
 accounts, and unrelated credentials must not be placed there.
+
+`omni host` is the persistent worker daemon. Omnibox is the separate hard
+boundary applied to agent OS tools and declared terminals: Bubblewrap plus
+seccomp on Linux and Seatbelt on macOS. The checked-in baseline grants writes
+only to the project tree, recursively masks hidden files, and fails closed if
+the requested backend is unavailable. Its initial unrestricted network mode is
+an explicit compatibility phase for native subscription CLIs; unattended
+projects require a reviewed default-deny `egress_rules` profile.
+
+The Omnigent supervisor and MCP server subprocesses are outside Omnibox.
+Server-managed MCP credentials avoid copying upstream secrets to workers, but
+each MCP process still needs its own filesystem, command, network, and policy
+constraints.
+
+On Omnigent 0.19.1 for macOS, the laptop has two separately verified gates.
+Keeping Codex's shared SQLite memory database session-local fixes app-server
+startup under Seatbelt. Subscription authentication still requires host
+`auth.json` read access, which would extend to agent-created subprocesses. The
+Mac may remain an enrolled interactive host, but it is not an approved
+unattended Codex worker until credential brokering or an equivalent upstream
+boundary passes the acceptance test.
 
 ## Credential classes
 

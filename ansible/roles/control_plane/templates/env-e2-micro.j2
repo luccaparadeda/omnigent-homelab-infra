@@ -1,0 +1,15 @@
+OMNIGENT_BASE_IMAGE={{ omnigent_base_image }}
+OMNIGENT_SERVER_IMAGE={{ omnigent_server_image }}
+OMNIGENT_BIND_IP={{ control_private_ip | default('127.0.0.1', true) }}
+OMNIGENT_PORT={{ omnigent_port }}
+OMNIGENT_BASE_URL={{ omnigent_base_url }}
+DATABASE_URL={{ omnigent_database_url }}
+OMNIGENT_ACCOUNTS_COOKIE_SECRET={{ omnigent_accounts_cookie_secret }}
+OMNIGENT_ACCOUNTS_INIT_ADMIN_PASSWORD={{ omnigent_accounts_init_admin_password }}
+OMNIGENT_CREDENTIAL_CIPHER={{ omnigent_credential_cipher }}
+OMNIGENT_CREDENTIAL_VAULT_KEY={{ omnigent_credential_vault_key }}
+OMNIGENT_CREDENTIAL_VAULT_MOUNT={{ omnigent_credential_vault_mount }}
+VAULT_PROXY_IMAGE={{ omnigent_vault_proxy_image }}
+VAULT_UPSTREAM_ADDR={{ omnigent_vault_addr }}
+VAULT_APPROLE_ROOT={{ omnigent_vault_approle_root }}
+OMNIGENT_DATA_ROOT={{ control_plane_data_root }}

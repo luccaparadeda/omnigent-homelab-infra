@@ -6,13 +6,17 @@ set -euo pipefail
 
 sudo apt-get update
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+  bubblewrap \
   build-essential \
   ca-certificates \
   curl \
+  dbus-user-session \
   docker.io \
   docker-compose-v2 \
   git \
+  gnome-keyring \
   jq \
+  libsecret-tools \
   pipx \
   python3-dev \
   python3-venv \

@@ -2,6 +2,7 @@
 - name: Install worker build and Python tooling
   ansible.builtin.apt:
     name:
+      - bubblewrap
       - build-essential
       - dbus-user-session
       - gnome-keyring
@@ -64,6 +65,23 @@
     group: "{{ omnigent_worker_user }}"
     mode: "0750"
 
+- name: Create the root-owned worker configuration directory
+  ansible.builtin.file:
+    path: "{{ omnigent_worker_config_dir }}"
+    state: directory
+    owner: root
+    group: "{{ omnigent_worker_user }}"
+    mode: "0750"
+
+- name: Install the credential-free Omnibox baseline
+  ansible.builtin.copy:
+    src: >-
+      {{ role_path }}/../../../configs/omnibox/coding-agent/config.yaml
+    dest: "{{ omnigent_worker_omnibox_profile_path }}"
+    owner: root
+    group: "{{ omnigent_worker_user }}"
+    mode: "0640"
+
 - name: Record server endpoint without a credential
   ansible.builtin.copy:
     dest: /etc/omnigent-worker.conf
@@ -82,4 +100,7 @@
       {{ omnigent_server_url }}`, test with
       `omni host {{ omnigent_server_url }}`, then run `omni host enable`.
       Subscription tokens and the resulting narrow host identity are
-      intentionally not baked into an image.
+      intentionally not baked into an image. Use
+      `{{ omnigent_worker_omnibox_profile_path }}` as the credential-free
+      Omnibox baseline and add reviewed project-specific egress rules before
+      unattended execution.

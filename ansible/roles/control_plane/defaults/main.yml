@@ -2,6 +2,10 @@
 control_plane_root: /opt/omnigent-control-plane
 control_plane_data_root: /srv/omnigent
 control_plane_start_services: false
+control_plane_compose_src: "{{ playbook_dir }}/../../compose/control-plane/compose.yaml"
+control_plane_env_template: env.j2
+control_plane_vault_proxy_template: vault-proxy.hcl.j2
+control_plane_swap_size_mb: 0
 omnigent_version: "0.19.1"
 omnigent_base_image: "ghcr.io/omnigent-ai/omnigent-server@sha256:b211b81fb739a7be9b326603d54511cc1f1e2f91f311b85ac2ea144c85129d56"
 omnigent_server_image: "local/omnigent-server-vault:0.19.1-hvac2.4.0"
@@ -12,6 +16,7 @@ omnigent_bind_ip: "127.0.0.1"
 omnigent_tailscale_serve_enabled: true
 omnigent_tailscale_serve_target: "http://127.0.0.1:{{ omnigent_port }}"
 omnigent_base_url: ""
+omnigent_database_url: ""
 omnigent_postgres_password: ""
 omnigent_accounts_cookie_secret: ""
 omnigent_accounts_init_admin_password: ""
@@ -28,6 +33,9 @@ omnigent_vault_proxy_credential_poll_interval: 5m
 omnigent_vault_proxy_addr: http://vault-proxy:8100
 omnigent_vault_ca_src: ""
 omnigent_vault_ca_root: /etc/omnigent/vault-ca
+omnigent_vault_approle_root: /etc/omnigent/vault-approle
+omnigent_vault_role_id_src: ""
+omnigent_vault_secret_id_src: ""
 omnigent_backup_enabled: false
 omnigent_backup_bucket: ""
 omnigent_backup_age_recipient: ""

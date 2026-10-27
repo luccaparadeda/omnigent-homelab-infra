@@ -66,8 +66,10 @@ Add `--execute` only after checking current backup count and free-tier usage.
 ## Restore drill
 
 1. Restore into an isolated VCN or disconnected test host.
-2. Recover Vault first and verify OCI KMS auto-unseal still works.
-3. Restore PostgreSQL and artifacts without exposing application ports publicly.
+2. Recover Vault first. For the current manual profile, unseal it with the
+   offline recovery material; for an optional KMS profile, verify auto-unseal.
+3. Restore the selected database tier (SQLite in the live E2 profile) and
+   artifacts without exposing application ports publicly.
 4. Validate login, session/artifact integrity, MCP registry metadata, and a test decrypt.
 5. Enroll a temporary worker and execute a harmless task.
 6. Record RPO/RTO and securely remove the test environment.
@@ -75,4 +77,6 @@ Add `--execute` only after checking current backup count and free-tier usage.
 Do not call the deployment recoverable until an encrypted off-node Raft
 snapshot and restore have both been tested.
 
-Vault recovery depends on the OCI KMS key. Do not delete or schedule deletion of that key without an explicit seal-migration and restore plan.
+An optional auto-unseal deployment depends on its OCI KMS key. Do not delete or
+schedule deletion of that key without an explicit seal-migration and restore
+plan. The current manual profile instead depends on protected recovery keys.

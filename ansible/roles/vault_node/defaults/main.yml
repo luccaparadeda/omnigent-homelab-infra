@@ -3,6 +3,10 @@ vault_root: /opt/omnigent-vault
 vault_data_root: /srv/vault
 vault_tls_root: /etc/omnigent/vault/tls
 vault_start_services: false
+vault_compose_src: "{{ playbook_dir }}/../../compose/vault/compose.yaml"
+vault_config_src: "{{ playbook_dir }}/../../compose/vault/config/vault.hcl"
+vault_env_template: env.j2
+vault_manual_unseal: false
 vault_image: "hashicorp/vault@sha256:962a92876e168d68eaaa24b0b8b49bbce1cb63024060a67bba95cd158a366fc2"
 # The pinned Alpine image creates its non-root vault account as 100:1000.
 # Re-verify these values whenever vault_image changes.

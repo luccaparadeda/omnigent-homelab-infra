@@ -1,0 +1,108 @@
+name: omnigent-control-plane
+
+services:
+  omnigent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BASE_IMAGE: ${OMNIGENT_BASE_IMAGE:?Set OMNIGENT_BASE_IMAGE in .env}
+    image: ${OMNIGENT_SERVER_IMAGE:?Set OMNIGENT_SERVER_IMAGE in .env}
+    user: "10001:10001"
+    restart: unless-stopped
+    depends_on:
+      vault-proxy:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
+      ARTIFACT_DIR: /data/artifacts
+      OMNIGENT_ADMIN_CREDENTIALS_PATH: /data/admin-credentials
+      OMNIGENT_AUTH_ENABLED: "1"
+      OMNIGENT_ACCOUNTS_BASE_URL: ${OMNIGENT_BASE_URL:?Set OMNIGENT_BASE_URL in .env}
+      OMNIGENT_ACCOUNTS_COOKIE_SECRET: ${OMNIGENT_ACCOUNTS_COOKIE_SECRET:?Set OMNIGENT_ACCOUNTS_COOKIE_SECRET in .env}
+      OMNIGENT_ACCOUNTS_INIT_ADMIN_PASSWORD: ${OMNIGENT_ACCOUNTS_INIT_ADMIN_PASSWORD:?Set OMNIGENT_ACCOUNTS_INIT_ADMIN_PASSWORD in .env}
+      OMNIGENT_CREDENTIAL_CIPHER: ${OMNIGENT_CREDENTIAL_CIPHER:?Set OMNIGENT_CREDENTIAL_CIPHER in .env}
+      OMNIGENT_CREDENTIAL_VAULT_KEY: ${OMNIGENT_CREDENTIAL_VAULT_KEY:?Set OMNIGENT_CREDENTIAL_VAULT_KEY in .env}
+      OMNIGENT_CREDENTIAL_VAULT_MOUNT: ${OMNIGENT_CREDENTIAL_VAULT_MOUNT:-transit}
+      # Vault Proxy binds only to this dedicated Docker bridge gateway. The
+      # proxy itself uses host networking so it can reach the remote tailnet.
+      VAULT_ADDR: http://172.30.255.1:8100
+    volumes:
+      - type: bind
+        source: ${OMNIGENT_DATA_ROOT:-/srv/omnigent}/artifacts
+        target: /data/artifacts
+      - type: bind
+        source: ${OMNIGENT_DATA_ROOT:-/srv/omnigent}/admin-credentials
+        target: /data/admin-credentials
+    ports:
+      - ${OMNIGENT_BIND_IP:-127.0.0.1}:${OMNIGENT_PORT:-8000}:8000
+    healthcheck:
+      test:
+        - CMD
+        - /opt/venv/bin/python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 90s
+    mem_limit: 768m
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - backend
+      - vault-client
+
+  vault-proxy:
+    image: ${VAULT_PROXY_IMAGE:?Set VAULT_PROXY_IMAGE in .env}
+    user: "100:1000"
+    restart: unless-stopped
+    entrypoint: /bin/vault
+    command: proxy -config=/vault/proxy/config.hcl
+    environment:
+      VAULT_ADDR: ${VAULT_UPSTREAM_ADDR:?Set VAULT_UPSTREAM_ADDR in .env}
+      VAULT_TRANSIT_KEY: ${OMNIGENT_CREDENTIAL_VAULT_KEY:-omnigent-credentials}
+      VAULT_TRANSIT_MOUNT: ${OMNIGENT_CREDENTIAL_VAULT_MOUNT:-transit}
+      NO_PROXY: 127.0.0.1,localhost
+      no_proxy: 127.0.0.1,localhost
+    volumes:
+      - type: bind
+        source: ./vault-proxy.hcl
+        target: /vault/proxy/config.hcl
+        read_only: true
+      - type: bind
+        source: ${VAULT_APPROLE_ROOT:-/etc/omnigent/vault-approle}/role-id
+        target: /vault/auth/role-id
+        read_only: true
+      - type: bind
+        source: ${VAULT_APPROLE_ROOT:-/etc/omnigent/vault-approle}/secret-id
+        target: /vault/auth/secret-id
+        read_only: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=0700,uid=100,gid=1000
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          wget -q -O /dev/null
+          "http://172.30.255.1:8100/v1/$${VAULT_TRANSIT_MOUNT}/keys/$${VAULT_TRANSIT_KEY}"
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    mem_limit: 128m
+    network_mode: host
+
+networks:
+  backend:
+    driver: bridge
+  vault-client:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.255.0/24
